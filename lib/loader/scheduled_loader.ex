@@ -2,6 +2,7 @@ defmodule Loader.ScheduledLoader do
   defmodule State do
     @enforce_keys [:load_profile]
     defstruct load_profile: nil,
+              total_task_count: nil,
               work_spec: nil,
               wall_clock_start_time: nil,
               mono_start_time: nil,
@@ -37,17 +38,17 @@ defmodule Loader.ScheduledLoader do
     load_profile = opts[:load_profile] || raise(ArgumentError, "must provide a load profile")
     work_spec = opts[:work_spec] || raise(ArgumentError, "must provide a work specification")
 
-    [{_first_tick_index, task_count} | curve] = LoadProfile.plot_curve(load_profile)
+    {[{_first_tick_index, task_count} | curve], total_task_count} =
+      LoadProfile.plot_curve(load_profile)
 
-    IO.inspect(Enum.reduce(curve, task_count, fn {_, tasks}, acc -> acc + tasks end),
-      label: "Total task count in curve"
-    )
+    IO.inspect(total_task_count, label: "Total task count in curve")
 
     Process.send_after(self(), {:tick, task_count}, load_profile.tick_resolution)
 
     {:ok,
      %State{
        load_profile: load_profile,
+       total_task_count: total_task_count,
        work_spec: work_spec,
        remaining_curve_points: curve,
        wall_clock_start_time: DateTime.utc_now(),
@@ -141,7 +142,11 @@ defmodule Loader.ScheduledLoader do
     success_count = Enum.count(state.successes)
     failure_count = Enum.count(state.failures)
 
-    if success_count + failure_count < state.load_profile.total_task_count do
+    if success_count + failure_count < state.total_task_count do
+      IO.puts(
+        "Waiting for #{state.total_task_count - (success_count + failure_count)} remaining tasks..."
+      )
+
       Process.send_after(self(), :await_remaining_tasks, 50)
 
       {:noreply, state}

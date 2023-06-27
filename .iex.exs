@@ -13,7 +13,7 @@ service_request_spec = %WorkSpec{
 }
 
 profiles = %{
-  default: LoadProfile.new!(),
-  three_k_uniform: LoadProfile.new!(%{function: fn _x -> 300 end}),
-  ten_k_uniform: LoadProfile.new!(%{function: fn _x -> 1_000 end})
+  default: LoadProfile.new(),
+  three_k_uniform: LoadProfile.new(%{function: fn _x -> 300 end}),
+  ten_k_uniform: LoadProfile.new(%{function: fn _x -> 1_000 end})
 }

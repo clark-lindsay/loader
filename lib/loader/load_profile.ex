@@ -3,6 +3,9 @@ defmodule Loader.LoadProfile do
   A struct representing a distribution of discrete work tasks over a period of time,
   and functions for working with that data.
 
+  See `Loader.LoadProfile.Curves` for details on defining the `function` of a `LoadProfile`, which
+  determines the distribution of work tasks.
+
   A `LoadProfile` is defined independently from the type of work being done. It could describe
   calls made against a remote service as easily as work done in a local module.
   """
@@ -17,7 +20,14 @@ defmodule Loader.LoadProfile do
           tick_resolution: 10
         }
 
-  def new!(props \\ %{}) do
+  @doc """
+  Returns a new `LoadProfile` based on the given props, with incorrect props set to default values.
+
+  ## Rules for props:
+    - `target_running_time`: **must** be a positive integer
+    - `function`: **must** be a 1-arity function. It should also return a number, but this isn't enforced
+  """
+  def new(props \\ %{}) do
     props =
       Map.update(props, :target_running_time, 10_000, fn
         time when is_integer(time) and time > 0 ->
@@ -25,6 +35,13 @@ defmodule Loader.LoadProfile do
 
         _ ->
           10_000
+      end)
+      |> Map.update(:function, &Loader.LoadProfile.Curves.uniform(&1, 10), fn func ->
+        if Function.info(func)[:arity] == 1 do
+          func
+        else
+          &Loader.LoadProfile.Curves.uniform(&1, 10)
+        end
       end)
 
     # the longer the running time, the more acceptable it is to space out the curve points and lose
@@ -48,18 +65,13 @@ defmodule Loader.LoadProfile do
     props =
       Map.merge(
         %{
-          function: &Loader.LoadProfile.Curves.uniform(&1, 10),
           tick_resolution: tick_resolution
         },
         props
       )
 
-    struct!(Loader.LoadProfile, props)
+    struct(Loader.LoadProfile, props)
   end
-
-  # i have simplified the problem space, because i am not the mathematician i once was.
-  # tick_resolution is **fixed** at 10 ms, and the target_running_time will always be given in an
-  # integer number of seconds
 
   @doc """
   Returns a 2-tuple: a plot of points that represents how tasks would be distributed for the given profile,
@@ -141,6 +153,12 @@ end
 # - exponential growth/ decay
 # - sine waves (using `:math`)
 defmodule Loader.LoadProfile.Curves do
+  @moduledoc """
+  Convenience functions for defining typical "curves" (i.e. "functions") for the request distribution
+  in a `LoadProfile`.
+
+  The unit for `x` is **always seconds**.
+  """
   def uniform(_x, y_intercept), do: linear(0, 0, y_intercept)
 
   def linear(x, slope, y_intercept), do: x * slope + y_intercept

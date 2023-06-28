@@ -26,8 +26,8 @@ service_call_spec = %WorkSpec{
       req_start = System.monotonic_time()
 
       response =
-        Finch.build(:get, "", [], "")
-        |> Finch.request(Loader.Finch)
+        Finch.build(:get, "http://website.io/public/api", [])
+        |> Finch.request(MyApp.Finch)
 
       %WorkResponse{
         response: response,

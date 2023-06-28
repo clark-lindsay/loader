@@ -75,7 +75,7 @@ defmodule Loader.LoadProfile do
 
   @doc """
   Returns a 2-tuple: a plot of points that represents how tasks would be distributed for the given profile,
-  and the total number of tasks "under the curve" (an approximate integral of the function, but reflecting
+  and the total number of tasks "under the curve" (an approximate integral of the function, reflecting
   the total number of tasks that will be executed).
   """
   @spec plot_curve(t()) :: {[{integer(), integer()}], integer()}
@@ -90,12 +90,17 @@ defmodule Loader.LoadProfile do
     # use `map_reduce`, and can thus use a stream instead so as not to materialize this
     # whole list?
 
+    # TODO: use less accurate Riemann sums for very large/ long-running profiles, to minimize computation
     # basically calculating the "left Riemann sum" with width of 0.005
     tick_count = Integer.floor_div(target_running_time, 5)
 
     {task_series, _acc} =
       Enum.map_reduce(0..(tick_count - 1), 0.0, fn tick_index, acc ->
-        {int_component, float_component} = split_float(function.(tick_index * 0.005) * 0.005)
+        {int_component, float_component} =
+          (function.(tick_index * 0.005) * 0.005)
+          |> max(0.0)
+          |> split_float()
+
         carry_over = acc + float_component
 
         cond do

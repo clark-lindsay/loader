@@ -74,6 +74,7 @@ Loader.execute_profiles([
 <!-- MDOC !-->
 
 Visualized, this second example would produce load on the service as shown, where `x` is in seconds and `y` is requests/ second:
+
 <img width="400 px" alt="constructive interference load graph" src="https://user-images.githubusercontent.com/47335328/249548414-b783e576-7aea-4bbf-a788-2140cfc5a9fe.png">
 
 

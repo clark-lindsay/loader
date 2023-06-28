@@ -1,13 +1,10 @@
 defmodule Loader.LoadProfile do
   @moduledoc """
-  A struct representing a distribution of discrete work tasks over a period of time,
-  and functions for working with that data.
+  A struct representing a distribution of discrete work tasks over a period of time, and functions for working with that data.
 
-  See `Loader.LoadProfile.Curves` for details on defining the `function` of a `LoadProfile`, which
-  determines the distribution of work tasks.
+  See `Loader.LoadProfile.Curves` for details on defining the `function` of a `LoadProfile`, which determines the distribution of work tasks.
 
-  A `LoadProfile` is defined independently from the type of work being done. It could describe
-  calls made against a remote service as easily as work done in a local module.
+  A `LoadProfile` is defined independently from the type of work being done. It could describe calls made against a remote service as easily as work done in a local module.
   """
 
   defstruct target_running_time: System.convert_time_unit(10, :second, :millisecond),
@@ -164,7 +161,34 @@ defmodule Loader.LoadProfile.Curves do
 
   The unit for `x` is **always seconds**.
   """
+
   def uniform(_x, y_intercept), do: linear(0, 0, y_intercept)
 
   def linear(x, slope, y_intercept), do: x * slope + y_intercept
+
+  @doc """
+  A sinusoidal function with a modification such that the result is always >= 0.
+  Accepts options to modify the oscillation of the wave.
+
+  ## Options
+
+    - `:amplitude`: a measure of the peak deviation of the wave from it's center, which will also be the amplitude, to keep all values >= 0. Defaults to `1`.
+    - `:frequency`: the number of oscillations (cycles) that occur each second. Defaults to `1`.
+    - `:angular_frequency`: the rate-of-change of the function, in units of radians/second. **Mutually exclusive** with `:frequency`, with `:angular_frequency` taking precedence. Defaults to `nil`.
+    - `:phase`: specifies, in radians, where in the wave's cycle the oscillation will begin, when x = 0. Defaults to `0`.
+
+  See https://en.wikipedia.org/wiki/Sine_wave for more info on sine waves
+  """
+  def sine_wave(x, opts \\ []) do
+    amplitude = opts[:amplitude] || 1
+    ordinary_frequency = opts[:frequency] || 1
+    angular_frequency = opts[:angular_frequency]
+    phase = opts[:phase] || 0
+
+    if angular_frequency do
+      amplitude * (:math.sin(angular_frequency * x + phase)) + amplitude
+    else
+      amplitude * (:math.sin(2 * :math.pi() * ordinary_frequency * x + phase)) + amplitude
+    end
+  end
 end

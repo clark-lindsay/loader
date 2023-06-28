@@ -1,7 +1,9 @@
 defmodule Loader do
-  @moduledoc """
-  Documentation for `Loader`.
-  """
+  @external_resource "README.md"
+  @moduledoc "README.md"
+             |> File.read!()
+             |> String.split("<!-- MDOC !-->")
+             |> Enum.fetch!(1)
 
   defmodule WorkResponse do
     @moduledoc """
@@ -72,5 +74,15 @@ defmodule Loader do
       Loader.DynamicSupervisor,
       Loader.ScheduledLoader.child_spec(load_profile: load_profile, work_spec: work_spec)
     )
+  end
+
+  @doc """
+  Execute several `LoadProfile`s simultaneously, each with their supplied `WorkSpec`
+  """
+  @spec execute_profiles([{Loader.LoadProfile.t(), Loader.WorkSpec.t()}]) :: [
+          DynamicSupervisor.on_start_child()
+        ]
+  def execute_profiles(profile_spec_pairs) do
+    Enum.map(profile_spec_pairs, fn {profile, spec} -> execute_profile(profile, spec) end)
   end
 end

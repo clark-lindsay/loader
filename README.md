@@ -61,7 +61,7 @@ linear_one_minute_profile =
 sine_wave_one_minute_profile =
   LoadProfile.new(%{
     target_running_time: 60,
-    function: fn x -> 5 * :math.sin(x) end # y = 5 * sin(x)
+    function: fn x -> 5 * (:math.sin(x) + 1) end # y = 5 * (sin(x) + 1)
   })
 
 Loader.execute_profiles([
@@ -75,7 +75,7 @@ Loader.execute_profiles([
 
 Visualized, this second example would produce load on the service as shown, where `x` is in seconds and `y` is requests/ second:
 
-<img width="400 px" alt="constructive interference load graph" src="https://user-images.githubusercontent.com/47335328/249548414-b783e576-7aea-4bbf-a788-2140cfc5a9fe.png">
+<img width="400 px" alt="constructive interference load graph" src="https://user-images.githubusercontent.com/47335328/249553919-631be393-0639-4855-9760-0b5db8092969.png">
 
 
 ## Installation

@@ -1,5 +1,12 @@
 # loader
 
+## disclaimer
+
+i started working on this project as a result of a suggestion from a friend that building a load tester and using it against naively constructed services
+to practice building/ fixing systems to make them more resilient against load.
+
+this project is not now, and may never, be suitable for use by others, but i hope it will be!
+
 <!-- MDOC !-->
 
 `loader` is a load-generating library that allows you to define arbitrary distributions of arbitrary work via mathematical functions and small structs. 

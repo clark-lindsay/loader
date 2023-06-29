@@ -186,9 +186,9 @@ defmodule Loader.LoadProfile.Curves do
     phase = opts[:phase] || 0
 
     if angular_frequency do
-      amplitude * (:math.sin(angular_frequency * x + phase)) + amplitude
+      amplitude * :math.sin(angular_frequency * x + phase) + amplitude
     else
-      amplitude * (:math.sin(2 * :math.pi() * ordinary_frequency * x + phase)) + amplitude
+      amplitude * :math.sin(2 * :math.pi() * ordinary_frequency * x + phase) + amplitude
     end
   end
 end

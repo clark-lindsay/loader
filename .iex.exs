@@ -1,15 +1,21 @@
 alias Loader.{LoadProfile, WorkResponse, WorkSpec, LoadProfile.Curves}
 
 service_request_spec = %WorkSpec{
-  task: fn req_count ->
-    Loader.send_requests(:get, "http://localhost:3000/services", count: req_count)
+  task: fn ->
+      Finch.build(:get, "http://localhost:3000/services", [])
+      |> Finch.request(Loader.Finch)
   end,
-  is_success?: fn %WorkResponse{response: res} ->
+  is_success?: fn %WorkResponse{data: res} ->
     case res do
       {:ok, _any} -> true
       _any -> false
     end
   end
+}
+
+simple_math_spec = %WorkSpec{
+  task: fn -> 2 + 2 end,
+  is_success?: fn %WorkResponse{data: data} -> is_integer(data) end
 }
 
 profiles = %{

@@ -7,13 +7,19 @@ defmodule Loader do
 
   defmodule WorkResponse do
     @moduledoc """
-    The response type that all "tasks" should use in their return type,
-    returning either a single "response" or a list of them.
+    Internal data structure used to represent the results of executing a `WorkSpec`
+
+    ## Properties
+
+      - `:data` -  whatever important data is returned by the work
+
+      - `:response_time` - **must be an integer number, in microseconds**, which is the "client-side" view of how long the work took. I recommend using `System.monotonic_time/0` or `:timer.tc/1`
     """
-    defstruct [:response, :response_time]
+    defstruct [:data, :kind, :response_time]
 
     @type t :: %__MODULE__{
-            response: any(),
+            data: any(),
+            kind: :ok | :error,
             response_time: integer()
           }
   end
@@ -22,16 +28,24 @@ defmodule Loader do
     @moduledoc """
     A specification for some "work" to do, to generate load.
     """
+    # TODO: should a user be able to specify a task that does not take a count? could we batch them ourselves?
+    # is it a good design to force the user to tell us how to execute their work in
+    # batches?
+    # maybe they can give us either `arity-0 func`, `arity-1 func`, or `{arity-0, arity-1}` and we
+    # handle batching as best we can?
+    # TODO: should a `reason` be attached to the `is_success?` callback? so that a user can do something like `{false, "too slow"}`?
     defstruct [:task, :is_success?]
 
     @type t :: %__MODULE__{
-            task: (() -> Loader.WorkResponse.t() | [Loader.WorkResponse.t()]) | mfa(),
+            task: (-> term()) | mfa(),
             is_success?: (Loader.WorkResponse.t() -> boolean())
           }
   end
 
   @doc """
-  Time measurements in the results are given in **microseconds** (i.e. 10^(-6))
+  Send HTTP requests, via `Finch`
+
+  **Will be removed**.
   """
   def send_requests(http_method, uri, opts \\ []) do
     count = opts[:count] || 1
@@ -55,7 +69,8 @@ defmodule Loader do
         |> Finch.request(Loader.Finch)
 
       %Loader.WorkResponse{
-        response: response,
+        data: response,
+        kind: :ok,
         response_time:
           (System.monotonic_time() - req_start)
           |> System.convert_time_unit(:native, :microsecond)
@@ -65,7 +80,7 @@ defmodule Loader do
   end
 
   @doc """
-  Execute tasks from the `work_spec` based on the parameters in the `load_profile`
+  Execute tasks based on the `work_spec`, scheduled based on the parameters in the `load_profile`
   """
   @spec execute_profile(Loader.LoadProfile.t(), Loader.WorkSpec.t()) ::
           DynamicSupervisor.on_start_child()

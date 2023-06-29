@@ -28,24 +28,11 @@ uniform_one_minute_profile =
   })
 
 service_call_spec = %WorkSpec{
-  task: fn count ->
-    Task.async_stream(1..count, fn req_index ->
-      req_start = System.monotonic_time()
-
-      response =
-        Finch.build(:get, "http://website.io/public/api", [])
-        |> Finch.request(MyApp.Finch)
-
-      %WorkResponse{
-        response: response,
-        response_time:
-          (System.monotonic_time() - req_start)
-          |> System.convert_time_unit(:native, :microsecond)
-      }
-    end)
-    |> Enum.map(fn {_tag, response} -> response end)
+  task: fn ->
+    Finch.build(:get, "http://website.io/public/api", [])
+    |> Finch.request(MyApp.Finch)
   end,
-  is_success?: fn %WorkResponse{response: res} ->
+  is_success?: fn %WorkResponse{data: res} ->
     case res do
       {:ok, _any} -> true
       _any -> false

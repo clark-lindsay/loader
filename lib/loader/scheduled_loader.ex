@@ -15,6 +15,7 @@ defmodule Loader.ScheduledLoader do
 
   alias Loader.LoadProfile
   alias Loader.ScheduledLoader.State
+  alias Loader.WorkResponse
   alias Loader.WorkSpec
 
   # based on the load profile i can calculate a curve and then send a message to myself every
@@ -58,19 +59,66 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def handle_info({:tick, task_count}, state) do
-    Task.Supervisor.async_nolink(Loader.TaskSupervisor, fn ->
-      # TODO: what happens when a task runs several times and fails?
-      # should each task be wrapped in a `try`, since a failure is acceptable?
-      case state.work_spec do
-        %WorkSpec{task: task} when is_function(task) ->
-          task.(task_count)
+    server_pid = self()
 
-        # could the MFA option be a struct that has an MFA and a way to add the task_count
-        # to the args, via a 2-arity callback?
-        %WorkSpec{task: {module, function, args}} ->
-          Kernel.apply(module, function, args ++ task_count)
+    Task.Supervisor.async_nolink(
+      {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}},
+      fn ->
+        Task.Supervisor.async_stream_nolink(
+          {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}},
+          1..task_count,
+          fn _ ->
+            task_mono_start = System.monotonic_time()
+
+            response =
+              try do
+                data =
+                  case state.work_spec do
+                    %WorkSpec{task: task} when is_function(task) ->
+                      task.()
+
+                    # could the MFA option be a struct that has an MFA and a way to add the task_count
+                    # to the args, via a 2-arity callback?
+                    %WorkSpec{task: {module, function, args}} ->
+                      Kernel.apply(module, function, args)
+                  end
+
+                response_time =
+                  System.convert_time_unit(
+                    System.monotonic_time() - task_mono_start,
+                    :native,
+                    :microsecond
+                  )
+
+                %WorkResponse{data: data, kind: :ok, response_time: response_time}
+              rescue
+                any_error ->
+                  response_time =
+                    System.convert_time_unit(
+                      System.monotonic_time() - task_mono_start,
+                      :native,
+                      :microsecond
+                    )
+
+                  %WorkResponse{kind: :error, data: any_error, response_time: response_time}
+              catch
+                kind, value ->
+                  response_time =
+                    System.convert_time_unit(
+                      System.monotonic_time() - task_mono_start,
+                      :native,
+                      :microsecond
+                    )
+
+                  %WorkResponse{kind: kind, data: value, response_time: response_time}
+              end
+
+            send(server_pid, {:task_complete, response})
+          end
+        )
+        |> Stream.run()
       end
-    end)
+    )
 
     {ticks, curve} =
       Enum.split_while(state.remaining_curve_points, fn {_tick_index, task_count} ->
@@ -78,9 +126,6 @@ defmodule Loader.ScheduledLoader do
       end)
 
     {triggering_tick_as_list, curve} = Enum.split(curve, 1)
-
-    # TODO: if `triggering_tick_as_list` is empty then we are done, and should start a shutdown
-    # critical that all work items complete before shutdown (failure being acceptable)
 
     if Enum.empty?(triggering_tick_as_list) do
       state = Map.put(state, :remaining_curve_points, curve)
@@ -107,32 +152,21 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   # a task completed successfully
-  def handle_info({ref, response}, state) do
-    Process.demonitor(ref, [:flush])
-
+  def handle_info({:task_complete, %WorkResponse{kind: :ok} = response}, state) do
     state =
-      case response do
-        response when is_list(response) ->
-          {goods, bads} = Enum.split_with(response, state.work_spec.is_success?)
-
-          Map.update!(state, :successes, fn successes -> goods ++ successes end)
-          |> Map.update!(:failures, fn failures -> bads ++ failures end)
-
-        response ->
-          if state.work_spec.is_success?.(response) do
-            Map.update!(state, :successes, fn successes -> [response | successes] end)
-          else
-            Map.update!(state, :failures, fn failures -> [response | failures] end)
-          end
+      if state.work_spec.is_success?.(response) do
+        Map.update!(state, :successes, fn successes -> [response | successes] end)
+      else
+        Map.update!(state, :failures, fn failures -> [response | failures] end)
       end
 
     {:noreply, state}
   end
 
   @impl GenServer
-  # a task failed
-  def handle_info({:DOWN, _ref, :process, _pid, reason}, state) do
-    state = Map.update!(state, :failures, fn failures -> [{:failure, reason} | failures] end)
+  # a task completed with errors
+  def handle_info({:task_complete, %WorkResponse{kind: :error} = response}, state) do
+    state = Map.update!(state, :failures, fn failures -> [response | failures] end)
 
     {:noreply, state}
   end
@@ -153,6 +187,15 @@ defmodule Loader.ScheduledLoader do
     else
       {:stop, :normal, state}
     end
+  end
+
+  @impl GenServer
+  # a `TaskSupervisor.async_nolink` task has completed successfully
+  def handle_info({ref, _return_value}, state) do
+    # We don't care about the DOWN message now, so let's demonitor and flush it
+    Process.demonitor(ref, [:flush])
+
+    {:noreply, state}
   end
 
   @impl GenServer

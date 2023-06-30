@@ -26,9 +26,7 @@ defmodule LoadProfileTest do
               amplitude <- bounded_number(),
               ordinary_frequency <- bounded_number(),
               phase <- StreamData.one_of([StreamData.integer(0..2), StreamData.float(min: 0.0, max: 2.0)]),
-              angular_frequency <- bounded_number(),
-              max_runs: 3_000,
-              max_run_time: :infinity
+              angular_frequency <- bounded_number()
             ) do
         assert 0 <=
                  Curves.sine_wave(x,

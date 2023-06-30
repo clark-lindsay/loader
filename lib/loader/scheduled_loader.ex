@@ -1,5 +1,14 @@
 defmodule Loader.ScheduledLoader do
+  @moduledoc false
+  use GenServer, restart: :transient
+
+  alias Loader.LoadProfile
+  alias Loader.ScheduledLoader.State
+  alias Loader.WorkResponse
+  alias Loader.WorkSpec
+
   defmodule State do
+    @moduledoc false
     @enforce_keys [:load_profile]
     defstruct load_profile: nil,
               total_task_count: nil,
@@ -10,13 +19,6 @@ defmodule Loader.ScheduledLoader do
               successes: [],
               failures: []
   end
-
-  use GenServer, restart: :transient
-
-  alias Loader.LoadProfile
-  alias Loader.ScheduledLoader.State
-  alias Loader.WorkResponse
-  alias Loader.WorkSpec
 
   # based on the load profile i can calculate a curve and then send a message to myself every
   # (however many) milliseconds (based on the curve) to fire off some number of tasks, inside a Task,
@@ -39,8 +41,7 @@ defmodule Loader.ScheduledLoader do
     load_profile = opts[:load_profile] || raise(ArgumentError, "must provide a load profile")
     work_spec = opts[:work_spec] || raise(ArgumentError, "must provide a work specification")
 
-    {[{_first_tick_index, task_count} | curve], total_task_count} =
-      LoadProfile.plot_curve(load_profile)
+    {[{_first_tick_index, task_count} | curve], total_task_count} = LoadProfile.plot_curve(load_profile)
 
     IO.inspect(total_task_count, label: "Total task count in curve")
 
@@ -64,8 +65,8 @@ defmodule Loader.ScheduledLoader do
     Task.Supervisor.async_nolink(
       {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}},
       fn ->
-        Task.Supervisor.async_stream_nolink(
-          {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}},
+        {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}}
+        |> Task.Supervisor.async_stream_nolink(
           1..task_count,
           fn _ ->
             task_mono_start = System.monotonic_time()
@@ -177,9 +178,7 @@ defmodule Loader.ScheduledLoader do
     failure_count = Enum.count(state.failures)
 
     if success_count + failure_count < state.total_task_count do
-      IO.puts(
-        "Waiting for #{state.total_task_count - (success_count + failure_count)} remaining tasks..."
-      )
+      IO.puts("Waiting for #{state.total_task_count - (success_count + failure_count)} remaining tasks...")
 
       Process.send_after(self(), :await_remaining_tasks, 50)
 

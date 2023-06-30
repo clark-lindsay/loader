@@ -26,7 +26,8 @@ defmodule Loader.LoadProfile do
   """
   def new(props \\ %{}) do
     props =
-      Map.update(props, :target_running_time, 10_000, fn
+      props
+      |> Map.update(:target_running_time, 10_000, fn
         time when is_integer(time) and time > 0 ->
           time * 1_000
 
@@ -142,7 +143,8 @@ defmodule Loader.LoadProfile do
     integer_component = trunc(f)
 
     float_component =
-      Decimal.from_float(f)
+      f
+      |> Decimal.from_float()
       |> Decimal.sub(Decimal.new(integer_component))
       |> Decimal.to_float()
 
@@ -175,7 +177,7 @@ defmodule Loader.LoadProfile.Curves do
 
   ## Options
 
-    - `:amplitude`: a measure of the peak deviation of the wave from it's center. To keep all values of the wave >= 0, the vertical center of the wave will also be equal to its amplitude. Defaults to `1`.
+    - `:amplitude`: a measure of the peak deviation of the wave from it's center. To keep all values of the wave >= 0, the vertical center of the wave will also be equal to its amplitude. Should be a positive number, and will be forced as such via `Kernel.abs/1`. Defaults to `1`.
     - `:frequency`: the number of oscillations (cycles) that occur each second. Defaults to `1`.
     - `:angular_frequency`: the rate-of-change of the function, in units of radians/second. **Mutually exclusive** with `:frequency`, with `:angular_frequency` taking precedence. Defaults to `nil`.
     - `:phase`: specifies, in radians, where in the wave's cycle the oscillation will begin, when x = 0. Defaults to `0`.
@@ -183,7 +185,7 @@ defmodule Loader.LoadProfile.Curves do
   See https://en.wikipedia.org/wiki/Sine_wave for more info on sine waves
   """
   def sine_wave(x, opts \\ []) do
-    amplitude = opts[:amplitude] || 1
+    amplitude = abs(opts[:amplitude] || 1)
     ordinary_frequency = opts[:frequency] || 1
     angular_frequency = opts[:angular_frequency]
     phase = opts[:phase] || 0

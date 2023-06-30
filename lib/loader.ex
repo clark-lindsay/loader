@@ -1,10 +1,10 @@
 defmodule Loader do
-  @external_resource "README.md"
   @moduledoc "README.md"
              |> File.read!()
              |> String.split("<!-- MDOC !-->")
              |> Enum.fetch!(1)
 
+  @external_resource "README.md"
   defmodule WorkResponse do
     @moduledoc """
     Internal data structure used to represent the results of executing a `WorkSpec`
@@ -52,7 +52,8 @@ defmodule Loader do
     headers = opts[:headers] || []
     body = opts[:body] || nil
 
-    Task.Supervisor.async_stream_nolink(Loader.TaskSupervisor, 1..count, fn req_index ->
+    Loader.TaskSupervisor
+    |> Task.Supervisor.async_stream_nolink(1..count, fn req_index ->
       body =
         if is_function(body) do
           body.(req_index)
@@ -65,15 +66,14 @@ defmodule Loader do
       # don't care if the tag is `:ok` or `:error`, it's up to the callback in the `WorkSpec` to
       # decide what's good and what's bad
       response =
-        Finch.build(http_method, uri, headers, body)
+        http_method
+        |> Finch.build(uri, headers, body)
         |> Finch.request(Loader.Finch)
 
       %Loader.WorkResponse{
         data: response,
         kind: :ok,
-        response_time:
-          (System.monotonic_time() - req_start)
-          |> System.convert_time_unit(:native, :microsecond)
+        response_time: System.convert_time_unit(System.monotonic_time() - req_start, :native, :microsecond)
       }
     end)
     |> Enum.map(fn {_tag, response} -> response end)

@@ -21,7 +21,8 @@ defmodule Loader.MixProject do
   defp deps do
     [
       {:finch, "~> 0.16"},
-      {:decimal, "~> 2.0"}
+      {:decimal, "~> 2.0"},
+      {:stream_data, "~> 0.5", only: :test, runtime: false},
     ]
   end
 end

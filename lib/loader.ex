@@ -37,7 +37,7 @@ defmodule Loader do
     defstruct [:task, :is_success?]
 
     @type t :: %__MODULE__{
-            task: (-> term()) | mfa(),
+            task: (() -> term()) | mfa(),
             is_success?: (Loader.WorkResponse.t() -> boolean())
           }
   end

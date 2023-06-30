@@ -150,14 +150,13 @@ defmodule Loader.LoadProfile do
   end
 end
 
-# TODO: add other "out-of-the-box" distributions:
-# - quadratic
-# - exponential growth/ decay
-# - sine waves (using `:math`)
 defmodule Loader.LoadProfile.Curves do
   @moduledoc """
   Convenience functions for defining typical "curves" (i.e. "functions") for the request distribution
   in a `LoadProfile`.
+
+  Some function families, like exponentiation and logarithms, are varied enough or complex enough that i believe they are better expressed as "plain" callback functions, e.g. `fn x -> -1 * :math.pow(2, (x + 3)) + 4`.
+  These function families have thus been excluded from this module.
 
   The unit for `x` is **always seconds**.
   """
@@ -166,13 +165,17 @@ defmodule Loader.LoadProfile.Curves do
 
   def linear(x, slope, y_intercept), do: x * slope + y_intercept
 
+  def quadratic(x, quadratic_coefficient, linear_coefficient \\ 1, constant \\ 0) do
+    quadratic_coefficient * x ** 2 + linear_coefficient * x + constant
+  end
+
   @doc """
   A sinusoidal function with a modification such that the result is always >= 0.
   Accepts options to modify the oscillation of the wave.
 
   ## Options
 
-    - `:amplitude`: a measure of the peak deviation of the wave from it's center, which will also be the amplitude, to keep all values >= 0. Defaults to `1`.
+    - `:amplitude`: a measure of the peak deviation of the wave from it's center. To keep all values of the wave >= 0, the vertical center of the wave will also be equal to its amplitude. Defaults to `1`.
     - `:frequency`: the number of oscillations (cycles) that occur each second. Defaults to `1`.
     - `:angular_frequency`: the rate-of-change of the function, in units of radians/second. **Mutually exclusive** with `:frequency`, with `:angular_frequency` taking precedence. Defaults to `nil`.
     - `:phase`: specifies, in radians, where in the wave's cycle the oscillation will begin, when x = 0. Defaults to `0`.

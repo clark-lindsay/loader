@@ -93,7 +93,7 @@ defmodule Loader.LoadProfile do
     tick_count = Integer.floor_div(target_running_time, 5)
 
     {task_series, _acc} =
-      Enum.map_reduce(0..(tick_count - 1), 0.0, fn tick_index, acc ->
+      Enum.map_reduce(0..max(tick_count - 1, 0), 0.0, fn tick_index, acc ->
         {int_component, float_component} =
           (function.(tick_index * 0.005) * 0.005)
           |> max(0.0)
@@ -160,13 +160,16 @@ defmodule Loader.LoadProfile.Curves do
   Some function families, like exponentiation and logarithms, are varied enough or complex enough that i believe they are better expressed as "plain" callback functions, e.g. `fn x -> -1 * :math.pow(2, (x + 3)) + 4`.
   These function families have thus been excluded from this module.
 
-  The unit for `x` is **always seconds**.
+  In the context of a `LoadProfile`, the unit for `x` is **always seconds**.
   """
 
+  @spec uniform(integer(), number()) :: number()
   def uniform(_x, y_intercept), do: linear(0, 0, y_intercept)
 
+  @spec linear(integer(), number(), number()) :: number()
   def linear(x, slope, y_intercept), do: x * slope + y_intercept
 
+  @spec quadratic(integer(), number(), number(), number()) :: number()
   def quadratic(x, quadratic_coefficient, linear_coefficient \\ 1, constant \\ 0) do
     quadratic_coefficient * x ** 2 + linear_coefficient * x + constant
   end
@@ -184,6 +187,7 @@ defmodule Loader.LoadProfile.Curves do
 
   See https://en.wikipedia.org/wiki/Sine_wave for more info on sine waves
   """
+  @spec sine_wave(integer(), keyword()) :: number()
   def sine_wave(x, opts \\ []) do
     amplitude = abs(opts[:amplitude] || 1)
     ordinary_frequency = opts[:frequency] || 1

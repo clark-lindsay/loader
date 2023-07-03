@@ -20,6 +20,7 @@ simple_math_spec = %WorkSpec{
 
 profiles = %{
   default: LoadProfile.new(),
+  two_k_uniform: LoadProfile.new(%{function: fn _x -> 200 end}),
   three_k_uniform: LoadProfile.new(%{function: fn _x -> 300 end}),
   ten_k_uniform: LoadProfile.new(%{function: fn _x -> 1_000 end}),
   ten_x_linear: LoadProfile.new(%{function: &Curves.linear(&1, 10, 0)}),

@@ -13,6 +13,7 @@ defmodule Loader.ScheduledLoader do
     defstruct load_profile: nil,
               total_task_count: nil,
               work_spec: nil,
+              ref: nil,
               wall_clock_start_time: nil,
               mono_start_time: nil,
               remaining_curve_points: nil,
@@ -43,7 +44,8 @@ defmodule Loader.ScheduledLoader do
 
     {[{_first_tick_index, task_count} | curve], total_task_count} = LoadProfile.plot_curve(load_profile)
 
-    IO.inspect(total_task_count, label: "Total task count in curve")
+    %{ref: ref, mono_start_time: mono_start_time, wall_clock_start_time: wall_clock_start_time} =
+      Loader.ExecutionStore.new_scheduled_loader(self(), total_task_count)
 
     Process.send_after(self(), {:tick, task_count}, load_profile.tick_resolution)
 
@@ -53,15 +55,14 @@ defmodule Loader.ScheduledLoader do
        total_task_count: total_task_count,
        work_spec: work_spec,
        remaining_curve_points: curve,
-       wall_clock_start_time: DateTime.utc_now(),
-       mono_start_time: System.monotonic_time()
+       wall_clock_start_time: wall_clock_start_time,
+       mono_start_time: mono_start_time,
+       ref: ref
      }}
   end
 
   @impl GenServer
   def handle_info({:tick, task_count}, state) do
-    server_pid = self()
-
     Task.Supervisor.async_nolink(
       {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}},
       fn ->
@@ -114,7 +115,11 @@ defmodule Loader.ScheduledLoader do
                   %WorkResponse{kind: kind, data: value, response_time: response_time}
               end
 
-            send(server_pid, {:task_complete, response})
+            if state.work_spec.is_success?.(response) do
+              Loader.ExecutionStore.increment_successes(state.ref)
+            else
+              Loader.ExecutionStore.increment_failures(state.ref)
+            end
           end
         )
         |> Stream.run()
@@ -152,33 +157,11 @@ defmodule Loader.ScheduledLoader do
   end
 
   @impl GenServer
-  # a task completed successfully
-  def handle_info({:task_complete, %WorkResponse{kind: :ok} = response}, state) do
-    state =
-      if state.work_spec.is_success?.(response) do
-        Map.update!(state, :successes, fn successes -> [response | successes] end)
-      else
-        Map.update!(state, :failures, fn failures -> [response | failures] end)
-      end
-
-    {:noreply, state}
-  end
-
-  @impl GenServer
-  # a task completed with errors
-  def handle_info({:task_complete, %WorkResponse{kind: :error} = response}, state) do
-    state = Map.update!(state, :failures, fn failures -> [response | failures] end)
-
-    {:noreply, state}
-  end
-
-  @impl GenServer
   def handle_info(:await_remaining_tasks, state) do
-    success_count = Enum.count(state.successes)
-    failure_count = Enum.count(state.failures)
+    {total, successes, fails} = Loader.ExecutionStore.task_counts(state.ref)
 
-    if success_count + failure_count < state.total_task_count do
-      IO.puts("Waiting for #{state.total_task_count - (success_count + failure_count)} remaining tasks...")
+    if successes + fails < total do
+      IO.puts("Waiting for #{total - (successes + fails)} remaining tasks...")
 
       Process.send_after(self(), :await_remaining_tasks, 50)
 
@@ -189,7 +172,7 @@ defmodule Loader.ScheduledLoader do
   end
 
   @impl GenServer
-  # a `TaskSupervisor.async_nolink` task has completed successfully
+  # a `Task` started via `TaskSupervisor.async_nolink` has completed successfully
   def handle_info({ref, _return_value}, state) do
     # We don't care about the DOWN message now, so let's demonitor and flush it
     Process.demonitor(ref, [:flush])
@@ -199,8 +182,12 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def terminate(reason, state) do
-    IO.puts("Successes: #{Enum.count(state.successes)}")
-    IO.puts("Failures: #{Enum.count(state.failures)}")
+    Loader.ExecutionStore.log_successful_termination(state.ref)
+    {_total, successes, failures} = Loader.ExecutionStore.task_counts(state.ref)
+
+    IO.puts("ETS log finalized with ref: #{inspect(state.ref)}")
+    IO.puts("Successes: #{successes}")
+    IO.puts("Failures: #{failures}")
 
     IO.puts(
       "Total running time in ms: #{System.convert_time_unit(System.monotonic_time() - state.mono_start_time, :native, :millisecond)}"

@@ -6,6 +6,8 @@ i started working on this project as a result of a suggestion from a friend that
 
 this project is not now, and may never, be suitable for use by others, but i hope it will be!
 
+## Summary
+
 <!-- MDOC !-->
 
 `loader` is a load-generating library that allows you to define arbitrary distributions of arbitrary work via mathematical functions and small structs. 
@@ -70,6 +72,17 @@ Visualized, this second example would produce load on the service as shown, wher
 
 <img width="400 px" alt="constructive interference load graph" src="https://user-images.githubusercontent.com/47335328/249553919-631be393-0639-4855-9760-0b5db8092969.png">
 
+## Telemetry
+
+`Loader` emits the following telemetry events:
+
+- `[:loader, :load_profile_execution, :start]` - emitted when `Loader.execute_profile/2` or `Loader.execute_profiles/1` is called.
+- `[:loader, :load_profile_execution, :stop]` - emitted when a `LoadProfile` has been fully emitted, regardless of the number of successes or failures of individual tasks
+- `[:loader, :task, :start]` - emitted when the `:task` callback from a `Loader.WorkSpec` is invoked
+- `[:loader, :task, :stop]` - emitted when the `:task` callback from a `Loader.WorkSpec` is invoked
+- `[:loader, :task, :exception]` - emitted if there is an uncaught exception while invoking the `:task` callback from a `Loader.WorkSpec`
+
+See the documentation for the `Loader.Telemetry` module for more information.
 
 ## Installation
 

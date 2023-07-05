@@ -23,7 +23,8 @@ defmodule Loader.MixProject do
       {:finch, "~> 0.16"},
       {:decimal, "~> 2.0"},
       {:stream_data, "~> 0.5", only: :test, runtime: false},
-      {:styler, "~> 0.8", only: [:dev, :test], runtime: false}
+      {:styler, "~> 0.8", only: [:dev, :test], runtime: false},
+      {:telemetry, "~> 0.4 or ~> 1.2"}
     ]
   end
 end

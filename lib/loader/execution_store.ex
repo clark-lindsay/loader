@@ -1,6 +1,7 @@
 defmodule Loader.ExecutionStore do
   @moduledoc """
   All entries in the `ets` tables "held" by this process should have the following format:
+  TODO: add duration after mono completion time
   ```
   {
     unique_ref, # via `make_ref/0`

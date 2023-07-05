@@ -5,6 +5,7 @@ defmodule Loader.ScheduledLoader do
   alias Loader.ExecutionStore
   alias Loader.LoadProfile
   alias Loader.ScheduledLoader.State
+  alias Loader.Telemetry
   alias Loader.WorkResponse
   alias Loader.WorkSpec
 
@@ -48,6 +49,12 @@ defmodule Loader.ScheduledLoader do
     {:ok, %{ref: ref, mono_start_time: mono_start_time, wall_clock_start_time: wall_clock_start_time}} =
       ExecutionStore.new_scheduled_loader(self(), total_task_count)
 
+    Telemetry.start(:load_profile_execution, %{
+      scheduled_loader_ref: ref,
+      load_profile: load_profile,
+      work_spec: work_spec
+    })
+
     Process.send_after(self(), {:tick, task_count}, load_profile.tick_resolution)
 
     {:ok,
@@ -71,31 +78,22 @@ defmodule Loader.ScheduledLoader do
         |> Task.Supervisor.async_stream_nolink(
           1..task_count,
           fn _ ->
-            task_mono_start = System.monotonic_time()
+            start_meta_data = %{scheduled_loader_ref: state.ref, work_spec: state.work_spec}
 
-            response =
-              try do
-                data =
-                  case state.work_spec do
-                    %WorkSpec{task: task} when is_function(task) ->
-                      task.()
+            Telemetry.span(:task, start_meta_data, fn ->
+              task_mono_start = System.monotonic_time()
 
-                    # could the MFA option be a struct that has an MFA and a way to add the task_count
-                    # to the args, via a 2-arity callback?
-                    %WorkSpec{task: {module, function, args}} ->
-                      Kernel.apply(module, function, args)
-                  end
+              response =
+                try do
+                  data =
+                    case state.work_spec do
+                      %WorkSpec{task: task} when is_function(task) ->
+                        task.()
 
-                response_time =
-                  System.convert_time_unit(
-                    System.monotonic_time() - task_mono_start,
-                    :native,
-                    :microsecond
-                  )
+                      %WorkSpec{task: {module, function, args}} ->
+                        Kernel.apply(module, function, args)
+                    end
 
-                %WorkResponse{data: data, kind: :ok, response_time: response_time}
-              rescue
-                any_error ->
                   response_time =
                     System.convert_time_unit(
                       System.monotonic_time() - task_mono_start,
@@ -103,24 +101,39 @@ defmodule Loader.ScheduledLoader do
                       :microsecond
                     )
 
-                  %WorkResponse{kind: :error, data: any_error, response_time: response_time}
-              catch
-                kind, value ->
-                  response_time =
-                    System.convert_time_unit(
-                      System.monotonic_time() - task_mono_start,
-                      :native,
-                      :microsecond
-                    )
+                  %WorkResponse{data: data, kind: :ok, response_time: response_time}
+                rescue
+                  any_error ->
+                    response_time =
+                      System.convert_time_unit(
+                        System.monotonic_time() - task_mono_start,
+                        :native,
+                        :microsecond
+                      )
 
-                  %WorkResponse{kind: kind, data: value, response_time: response_time}
+                    %WorkResponse{kind: :error, data: any_error, response_time: response_time}
+                catch
+                  kind, value ->
+                    response_time =
+                      System.convert_time_unit(
+                        System.monotonic_time() - task_mono_start,
+                        :native,
+                        :microsecond
+                      )
+
+                    %WorkResponse{kind: kind, data: value, response_time: response_time}
+                end
+
+              is_success? = state.work_spec.is_success?.(response)
+
+              if is_success? do
+                ExecutionStore.increment_successes(state.ref)
+              else
+                ExecutionStore.increment_failures(state.ref)
               end
 
-            if state.work_spec.is_success?.(response) do
-              ExecutionStore.increment_successes(state.ref)
-            else
-              ExecutionStore.increment_failures(state.ref)
-            end
+              {response, Map.put(start_meta_data, :was_success?, is_success?)}
+            end)
           end
         )
         |> Stream.run()
@@ -183,15 +196,28 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def terminate(reason, state) do
-    ExecutionStore.log_successful_termination(state.ref)
     {_total, successes, failures} = ExecutionStore.task_counts(state.ref)
+    ExecutionStore.log_successful_termination(state.ref)
+
+    end_time =
+      Telemetry.stop(
+        :load_profile_execution,
+        state.mono_start_time,
+        %{
+          scheduled_loader_ref: state.ref,
+          load_profile: state.load_profile,
+          work_spec: state.work_spec,
+          successes: successes,
+          failures: failures
+        }
+      )
 
     IO.puts("ETS log finalized with ref: #{inspect(state.ref)}")
     IO.puts("Successes: #{successes}")
     IO.puts("Failures: #{failures}")
 
     IO.puts(
-      "Total running time in ms: #{System.convert_time_unit(System.monotonic_time() - state.mono_start_time, :native, :millisecond)}"
+      "Total running time in ms: #{System.convert_time_unit(end_time - state.mono_start_time, :native, :millisecond)}"
     )
 
     IO.puts("Terminating with reason: #{reason}")

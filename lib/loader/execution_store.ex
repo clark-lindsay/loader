@@ -31,14 +31,13 @@ defmodule Loader.ExecutionStore do
     {:ok, %{}}
   end
 
-  # TODO: should probably return "tagged" tuples
   def new_scheduled_loader(pid, total_task_count) do
     loader_ref = make_ref()
     wall_clock_start_time = DateTime.utc_now()
     mono_start_time = System.monotonic_time()
 
-    true =
-      :ets.insert(
+    was_insert_success? =
+      :ets.insert_new(
         ExecutionStore,
         {
           loader_ref,
@@ -53,9 +52,16 @@ defmodule Loader.ExecutionStore do
         }
       )
 
-    %{ref: loader_ref, wall_clock_start_time: wall_clock_start_time, mono_start_time: mono_start_time}
+    if was_insert_success? do
+      {:ok, %{ref: loader_ref, wall_clock_start_time: wall_clock_start_time, mono_start_time: mono_start_time}}
+    else
+      {:error, "key already exists in table"}
+    end
   end
 
+  # intentionally not handling errors here b/c an issue here would be truly exceptional:
+  # it would either mean that there is a bug in the library code, or that somehow a 
+  # `ScheduledLoader` is trying to increment a counter or terminate when it has not been properly initialized
   def increment_successes(scheduled_loader_ref) do
     :ets.update_counter(ExecutionStore, scheduled_loader_ref, {8, 1})
   end
@@ -70,11 +76,11 @@ defmodule Loader.ExecutionStore do
     {total, successes, fails}
   end
 
-  # TODO: should probably return "tagged" tuples
   def log_successful_termination(scheduled_loader_ref) do
-    true = :ets.update_element(ExecutionStore, scheduled_loader_ref, [
-      {4, System.monotonic_time()},
-      {6, DateTime.utc_now()},
-    ])
+    true =
+      :ets.update_element(ExecutionStore, scheduled_loader_ref, [
+        {4, System.monotonic_time()},
+        {6, DateTime.utc_now()}
+      ])
   end
 end

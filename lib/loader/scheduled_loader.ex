@@ -2,6 +2,7 @@ defmodule Loader.ScheduledLoader do
   @moduledoc false
   use GenServer, restart: :transient
 
+  alias Loader.ExecutionStore
   alias Loader.LoadProfile
   alias Loader.ScheduledLoader.State
   alias Loader.WorkResponse
@@ -44,8 +45,8 @@ defmodule Loader.ScheduledLoader do
 
     {[{_first_tick_index, task_count} | curve], total_task_count} = LoadProfile.plot_curve(load_profile)
 
-    %{ref: ref, mono_start_time: mono_start_time, wall_clock_start_time: wall_clock_start_time} =
-      Loader.ExecutionStore.new_scheduled_loader(self(), total_task_count)
+    {:ok, %{ref: ref, mono_start_time: mono_start_time, wall_clock_start_time: wall_clock_start_time}} =
+      ExecutionStore.new_scheduled_loader(self(), total_task_count)
 
     Process.send_after(self(), {:tick, task_count}, load_profile.tick_resolution)
 
@@ -116,9 +117,9 @@ defmodule Loader.ScheduledLoader do
               end
 
             if state.work_spec.is_success?.(response) do
-              Loader.ExecutionStore.increment_successes(state.ref)
+              ExecutionStore.increment_successes(state.ref)
             else
-              Loader.ExecutionStore.increment_failures(state.ref)
+              ExecutionStore.increment_failures(state.ref)
             end
           end
         )
@@ -158,7 +159,7 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def handle_info(:await_remaining_tasks, state) do
-    {total, successes, fails} = Loader.ExecutionStore.task_counts(state.ref)
+    {total, successes, fails} = ExecutionStore.task_counts(state.ref)
 
     if successes + fails < total do
       IO.puts("Waiting for #{total - (successes + fails)} remaining tasks...")
@@ -182,8 +183,8 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def terminate(reason, state) do
-    Loader.ExecutionStore.log_successful_termination(state.ref)
-    {_total, successes, failures} = Loader.ExecutionStore.task_counts(state.ref)
+    ExecutionStore.log_successful_termination(state.ref)
+    {_total, successes, failures} = ExecutionStore.task_counts(state.ref)
 
     IO.puts("ETS log finalized with ref: #{inspect(state.ref)}")
     IO.puts("Successes: #{successes}")

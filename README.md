@@ -97,7 +97,7 @@ Visualized, this second example would produce load on the service as shown, wher
 `Loader` emits the following telemetry events:
 
 - `[:loader, :load_profile_execution, :start]` - emitted when `Loader.execute/2` is called.
-- `[:loader, :load_profile_execution, :stop]` - emitted when a `LoadProfile` has been fully emitted, regardless of the number of successes or failures of individual tasks
+- `[:loader, :load_profile_execution, :stop]` - emitted when a `LoadProfile` has been fully executed, regardless of the number of successes or failures of individual tasks
 - `[:loader, :task, :start]` - emitted when the `:task` callback from a `Loader.WorkSpec` is invoked
 - `[:loader, :task, :stop]` - emitted when the `:task` callback from a `Loader.WorkSpec` is invoked
 - `[:loader, :task, :exception]` - emitted if there is an uncaught exception while invoking the `:task` callback from a `Loader.WorkSpec`

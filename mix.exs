@@ -16,7 +16,7 @@ defmodule Loader.MixProject do
       elixir: "~> 1.14",
       package: package(),
       start_permanent: Mix.env() == :prod,
-      version: "0.2.0"
+      version: "0.2.1"
     ]
   end
 
@@ -38,10 +38,7 @@ defmodule Loader.MixProject do
   end
 
   defp description do
-    "README.md"
-    |> File.read!()
-    |> String.split("<!-- DESCRIPTION !-->")
-    |> Enum.fetch!(1)
+    "Load-generation with arbitrary distributions, defined like mathematical functions"
   end
 
   defp package do

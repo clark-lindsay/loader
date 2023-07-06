@@ -1,13 +1,22 @@
 defmodule Loader.MixProject do
+  @name "Loader"
+  @external_resource "README.md"
+
   use Mix.Project
 
   def project do
     [
       app: :loader,
-      version: "0.1.0",
+      deps: deps(),
+      description: description(),
+      docs: [
+        # The main page in the docs 
+        main: @name
+      ],
       elixir: "~> 1.14",
+      package: package(),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      version: "0.2.0"
     ]
   end
 
@@ -20,11 +29,29 @@ defmodule Loader.MixProject do
 
   defp deps do
     [
-      {:finch, "~> 0.16"},
       {:decimal, "~> 2.0"},
+      {:ex_doc, ">= 0.0.0", only: :dev},
       {:stream_data, "~> 0.5", only: :test, runtime: false},
       {:styler, "~> 0.8", only: [:dev, :test], runtime: false},
       {:telemetry, "~> 0.4 or ~> 1.2"}
+    ]
+  end
+
+  defp description do
+    "README.md"
+    |> File.read!()
+    |> String.split("<!-- DESCRIPTION !-->")
+    |> Enum.fetch!(1)
+  end
+
+  defp package do
+    [
+      maintainers: ["Clark Lindsay"],
+      licenses: ["MIT"],
+      links: %{
+        GitHub: "https://github.com/clark-lindsay/loader"
+      },
+      source_url: "https://github.com/clark-lindsay/loader"
     ]
   end
 end

@@ -6,7 +6,6 @@ defmodule Loader.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Finch, name: Loader.Finch},
       {Loader.ExecutionStore, %{}},
       {PartitionSupervisor, child_spec: Task.Supervisor, name: Loader.TaskSupervisors},
       {DynamicSupervisor, name: Loader.DynamicSupervisor}

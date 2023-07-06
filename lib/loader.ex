@@ -43,43 +43,6 @@ defmodule Loader do
   end
 
   @doc """
-  Send HTTP requests, via `Finch`
-
-  **Will be removed**.
-  """
-  def send_requests(http_method, uri, opts \\ []) do
-    count = opts[:count] || 1
-    headers = opts[:headers] || []
-    body = opts[:body] || nil
-
-    Loader.TaskSupervisor
-    |> Task.Supervisor.async_stream_nolink(1..count, fn req_index ->
-      body =
-        if is_function(body) do
-          body.(req_index)
-        else
-          body
-        end
-
-      req_start = System.monotonic_time()
-
-      # don't care if the tag is `:ok` or `:error`, it's up to the callback in the `WorkSpec` to
-      # decide what's good and what's bad
-      response =
-        http_method
-        |> Finch.build(uri, headers, body)
-        |> Finch.request(Loader.Finch)
-
-      %Loader.WorkResponse{
-        data: response,
-        kind: :ok,
-        response_time: System.convert_time_unit(System.monotonic_time() - req_start, :native, :microsecond)
-      }
-    end)
-    |> Enum.map(fn {_tag, response} -> response end)
-  end
-
-  @doc """
   Execute tasks based on the `work_spec`, scheduled based on the parameters in the `load_profile`
   """
   @spec execute_profile(Loader.LoadProfile.t(), Loader.WorkSpec.t()) ::

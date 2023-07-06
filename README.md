@@ -1,4 +1,4 @@
-# loader
+# Loader
 
 ## disclaimer
 
@@ -9,10 +9,14 @@ this project is not now, and may never, be suitable for use by others, but i hop
 ## Summary
 
 <!-- MDOC !-->
+<!-- DESCRIPTION !-->
 
-`loader` is a load-generating library that allows you to define arbitrary distributions of arbitrary work via mathematical functions and small structs. 
+`Loader` is a load-generating library that allows you to define arbitrary distributions of arbitrary work via mathematical functions and small structs. 
+
+<!-- DESCRIPTION !-->
 
 These distributions, called `LoadProfile`s, can be paired up with a `WorkSpec` and executed to generate load, and gather statistics from a client's perspective.
+
 
 ## Example
 
@@ -66,8 +70,6 @@ Loader.execute_profiles([
 ])
 ```
 
-<!-- MDOC !-->
-
 Visualized, this second example would produce load on the service as shown, where `x` is in seconds and `y` is requests/ second:
 
 <img width="400 px" alt="constructive interference load graph" src="https://user-images.githubusercontent.com/47335328/249553919-631be393-0639-4855-9760-0b5db8092969.png">
@@ -86,18 +88,15 @@ See the documentation for the `Loader.Telemetry` module for more information.
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `loader` to your list of dependencies in `mix.exs`:
+The package can be installed by adding `loader` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:loader, "~> 0.1.0"}
+    {:loader, "~> 0.2.0"}
   ]
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/loader>.
+The docs can be found at <https://hexdocs.pm/loader>.
 

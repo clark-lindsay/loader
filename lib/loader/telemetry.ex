@@ -8,7 +8,7 @@ defmodule Loader.Telemetry do
 
   ### Load Profile Execution Start
 
-  `[:loader, :load_profile_execution, :start]` - emitted when `Loader.execute_profile/2` or `Loader.execute_profiles/1` is called.
+  `[:loader, :load_profile_execution, :start]` - emitted when `Loader.execute/2` is called.
 
   #### Measurements
 
@@ -16,6 +16,7 @@ defmodule Loader.Telemetry do
 
   #### Metadata
 
+    * `:instance_name` - the `:name` used to start the root supervisor for `Loader`
     * `:load_profile` - profile (`Loader.LoadProfile`)
     * `:scheduled_loader_ref` - (almost) unique reference generated for the process that is handling execution of the profile. Generated with `make_ref/0`
     * `:work_spec` - specification for each task to be executed (`Loader.WorkSpec`)
@@ -31,6 +32,7 @@ defmodule Loader.Telemetry do
   #### Metadata
 
     * `:failures` - number of tasks deemed unsuccessful, based on the `WorkSpec`
+    * `:instance_name` - the `:name` used to start the root supervisor for `Loader`
     * `:load_profile` - profile (`Loader.LoadProfile`)
     * `:scheduled_loader_ref` - (almost) unique reference generated for the process that handled execution of the profile. Generated with `make_ref/0`
     * `:successes` - number of tasks deemed successful, based on the `WorkSpec`
@@ -47,6 +49,7 @@ defmodule Loader.Telemetry do
 
   #### Metadata
 
+    * `:instance_name` - the `:name` used to start the root supervisor for `Loader`
     * `:scheduled_loader_ref` - (almost) unique reference generated for the process that handled execution of the profile. Generated with `make_ref/0`
     * `:telemetry_span_context` - (almost) unique reference generated for the span execution
     * `:work_spec` - specification for the task (`Loader.WorkSpec`)
@@ -62,6 +65,7 @@ defmodule Loader.Telemetry do
 
   #### Metadata
 
+    * `:instance_name` - the `:name` used to start the root supervisor for `Loader`
     * `:scheduled_loader_ref` - (almost) unique reference generated for the process that handled execution of the profile. Generated with `make_ref/0`
     * `:telemetry_span_context` - (almost) unique reference generated for the span execution
     * `:was_success?` - whether or not the task was successful, according to the `WorkSpec`
@@ -78,6 +82,7 @@ defmodule Loader.Telemetry do
 
   #### Metadata
 
+    * `:instance_name` - the `:name` used to start the root supervisor for `Loader`
     * `:kind` - the type of exception
     * `:reason` - whatever reason is given by the exception
     * `:scheduled_loader_ref` - (almost) unique reference generated for the process that handled execution of the profile. Generated with `make_ref/0`

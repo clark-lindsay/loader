@@ -20,7 +20,8 @@ defmodule Loader.ScheduledLoader do
               mono_start_time: nil,
               remaining_curve_points: nil,
               successes: [],
-              failures: []
+              failures: [],
+              instance_name: nil
   end
 
   # based on the load profile i can calculate a curve and then send a message to myself every
@@ -41,18 +42,20 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def init(opts) do
+    instance_name = opts[:instance_name] || raise(ArgumentError, "must provide an instance name")
     load_profile = opts[:load_profile] || raise(ArgumentError, "must provide a load profile")
     work_spec = opts[:work_spec] || raise(ArgumentError, "must provide a work specification")
 
     {[{_first_tick_index, task_count} | curve], total_task_count} = LoadProfile.plot_curve(load_profile)
 
     {:ok, %{ref: ref, mono_start_time: mono_start_time, wall_clock_start_time: wall_clock_start_time}} =
-      ExecutionStore.new_scheduled_loader(self(), total_task_count)
+      ExecutionStore.new_scheduled_loader(instance_name, self(), total_task_count)
 
     Telemetry.start(:load_profile_execution, %{
       scheduled_loader_ref: ref,
       load_profile: load_profile,
-      work_spec: work_spec
+      work_spec: work_spec,
+      instance_name: instance_name
     })
 
     Process.send_after(self(), {:tick, task_count}, load_profile.tick_resolution)
@@ -60,6 +63,7 @@ defmodule Loader.ScheduledLoader do
     {:ok,
      %State{
        load_profile: load_profile,
+       instance_name: instance_name,
        total_task_count: total_task_count,
        work_spec: work_spec,
        remaining_curve_points: curve,
@@ -72,13 +76,17 @@ defmodule Loader.ScheduledLoader do
   @impl GenServer
   def handle_info({:tick, task_count}, state) do
     Task.Supervisor.async_nolink(
-      {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}},
+      {:via, PartitionSupervisor, {Loader.task_supervisors_name(state.instance_name), self()}},
       fn ->
-        {:via, PartitionSupervisor, {Loader.TaskSupervisors, self()}}
+        {:via, PartitionSupervisor, {Loader.task_supervisors_name(state.instance_name), self()}}
         |> Task.Supervisor.async_stream_nolink(
           1..task_count,
           fn _ ->
-            start_meta_data = %{scheduled_loader_ref: state.ref, work_spec: state.work_spec}
+            start_meta_data = %{
+              scheduled_loader_ref: state.ref,
+              work_spec: state.work_spec,
+              instance_name: state.instance_name
+            }
 
             Telemetry.span(:task, start_meta_data, fn ->
               task_mono_start = System.monotonic_time()
@@ -127,9 +135,9 @@ defmodule Loader.ScheduledLoader do
               is_success? = state.work_spec.is_success?.(response)
 
               if is_success? do
-                ExecutionStore.increment_successes(state.ref)
+                ExecutionStore.increment_successes(state.instance_name, state.ref)
               else
-                ExecutionStore.increment_failures(state.ref)
+                ExecutionStore.increment_failures(state.instance_name, state.ref)
               end
 
               {response, Map.put(start_meta_data, :was_success?, is_success?)}
@@ -172,7 +180,7 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def handle_info(:await_remaining_tasks, state) do
-    {total, successes, fails} = ExecutionStore.task_counts(state.ref)
+    {total, successes, fails} = ExecutionStore.task_counts(state.instance_name, state.ref)
 
     if successes + fails < total do
       IO.puts("Waiting for #{total - (successes + fails)} remaining tasks...")
@@ -196,19 +204,20 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def terminate(reason, state) do
-    {_total, successes, failures} = ExecutionStore.task_counts(state.ref)
-    ExecutionStore.log_successful_termination(state.ref)
+    {_total, successes, failures} = ExecutionStore.task_counts(state.instance_name, state.ref)
+    ExecutionStore.log_successful_termination(state.instance_name, state.ref)
 
     end_time =
       Telemetry.stop(
         :load_profile_execution,
         state.mono_start_time,
         %{
-          scheduled_loader_ref: state.ref,
+          failures: failures,
+          instance_name: state.instance_name,
           load_profile: state.load_profile,
-          work_spec: state.work_spec,
+          scheduled_loader_ref: state.ref,
           successes: successes,
-          failures: failures
+          work_spec: state.work_spec
         }
       )
 

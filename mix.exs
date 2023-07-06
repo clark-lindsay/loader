@@ -1,8 +1,8 @@
 defmodule Loader.MixProject do
+  use Mix.Project
+
   @name "Loader"
   @external_resource "README.md"
-
-  use Mix.Project
 
   def project do
     [
@@ -16,14 +16,13 @@ defmodule Loader.MixProject do
       elixir: "~> 1.14",
       package: package(),
       start_permanent: Mix.env() == :prod,
-      version: "0.2.1"
+      version: "0.3.0"
     ]
   end
 
   def application do
     [
-      extra_applications: [:logger],
-      mod: {Loader.Application, []}
+      extra_applications: [:logger]
     ]
   end
 

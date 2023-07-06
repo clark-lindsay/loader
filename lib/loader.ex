@@ -4,7 +4,10 @@ defmodule Loader do
              |> String.split("<!-- MDOC !-->")
              |> Enum.fetch!(1)
 
+  use Supervisor
+
   @external_resource "README.md"
+
   defmodule WorkResponse do
     @moduledoc """
     Internal data structure used to represent the results of executing a `WorkSpec`
@@ -28,11 +31,6 @@ defmodule Loader do
     @moduledoc """
     A specification for some "work" to do, to generate load.
     """
-    # TODO: should a user be able to specify a task that does not take a count? could we batch them ourselves?
-    # is it a good design to force the user to tell us how to execute their work in
-    # batches?
-    # maybe they can give us either `arity-0 func`, `arity-1 func`, or `{arity-0, arity-1}` and we
-    # handle batching as best we can?
     # TODO: should a `reason` be attached to the `is_success?` callback? so that a user can do something like `{false, "too slow"}`?
     defstruct [:task, :is_success?]
 
@@ -43,24 +41,67 @@ defmodule Loader do
   end
 
   @doc """
-  Execute tasks based on the `work_spec`, scheduled based on the parameters in the `load_profile`
+  Start an instance of `Loader`
+
+  ## Options
+
+    * `:name` - The name of your Loader instance. This field is required.
   """
-  @spec execute_profile(Loader.LoadProfile.t(), Loader.WorkSpec.t()) ::
-          DynamicSupervisor.on_start_child()
-  def execute_profile(load_profile, work_spec) do
-    DynamicSupervisor.start_child(
-      Loader.DynamicSupervisor,
-      Loader.ScheduledLoader.child_spec(load_profile: load_profile, work_spec: work_spec)
-    )
+  def start_link(opts) do
+    name = opts[:name] || raise(ArgumentError, "must supply a name")
+
+    config = %{
+      dynamic_supervisor_name: dynamic_supervisor_name(name),
+      execution_store_name: execution_store_name(name),
+      task_supervisors_name: task_supervisors_name(name)
+    }
+
+    Supervisor.start_link(__MODULE__, config, name: :"#{name}.Supervisor")
+  end
+
+  def child_spec(opts) do
+    %{
+      id: opts[:name] || raise(ArgumentError, "must supply a name"),
+      start: {__MODULE__, :start_link, [opts]}
+    }
+  end
+
+  @impl Supervisor
+  def init(config) do
+    children = [
+      {Loader.ExecutionStore, name: config.execution_store_name},
+      {PartitionSupervisor, child_spec: Task.Supervisor, name: config.task_supervisors_name},
+      {DynamicSupervisor, name: config.dynamic_supervisor_name}
+    ]
+
+    Supervisor.init(children, strategy: :one_for_one)
   end
 
   @doc """
-  Execute several `LoadProfile`s simultaneously, each with their supplied `WorkSpec`
+  Execute tasks defined by the `work_spec`, scheduled based on the `load_profile`. When provided with a list, all profiles will be executed concurrently.
+
+  See `Loader.LoadProfile` for more information on how to define a profile.
   """
-  @spec execute_profiles([{Loader.LoadProfile.t(), Loader.WorkSpec.t()}]) :: [
+  @spec execute({Loader.LoadProfile.t(), Loader.WorkSpec.t()}, atom()) ::
+          DynamicSupervisor.on_start_child()
+  def execute({load_profile, work_spec}, instance_name) do
+    DynamicSupervisor.start_child(
+      dynamic_supervisor_name(instance_name),
+      Loader.ScheduledLoader.child_spec(load_profile: load_profile, work_spec: work_spec, instance_name: instance_name)
+    )
+  end
+
+  @spec execute([{Loader.LoadProfile.t(), Loader.WorkSpec.t()}], atom()) :: [
           DynamicSupervisor.on_start_child()
         ]
-  def execute_profiles(profile_spec_pairs) do
-    Enum.map(profile_spec_pairs, fn {profile, spec} -> execute_profile(profile, spec) end)
+  def execute(profile_spec_pairs, instance_name) do
+    Enum.map(profile_spec_pairs, fn {profile, spec} -> execute({profile, spec}, instance_name) end)
   end
+
+  @doc false
+  def execution_store_name(instance_name), do: :"#{instance_name}.ExecutionStore"
+  @doc false
+  def task_supervisors_name(instance_name), do: :"#{instance_name}.TaskSupervisors"
+  @doc false
+  def dynamic_supervisor_name(instance_name), do: :"#{instance_name}.DynamicSupervisor"
 end

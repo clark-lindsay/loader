@@ -75,10 +75,12 @@ defmodule Loader.ScheduledLoader do
 
   @impl GenServer
   def handle_info({:tick, task_count}, state) do
+    via_partition_supervisor = {:via, PartitionSupervisor, {Loader.task_supervisors_name(state.instance_name), self()}}
+
     Task.Supervisor.async_nolink(
-      {:via, PartitionSupervisor, {Loader.task_supervisors_name(state.instance_name), self()}},
+      via_partition_supervisor,
       fn ->
-        {:via, PartitionSupervisor, {Loader.task_supervisors_name(state.instance_name), self()}}
+        via_partition_supervisor
         |> Task.Supervisor.async_stream_nolink(
           1..task_count,
           fn _ ->
@@ -102,34 +104,14 @@ defmodule Loader.ScheduledLoader do
                         Kernel.apply(module, function, args)
                     end
 
-                  response_time =
-                    System.convert_time_unit(
-                      System.monotonic_time() - task_mono_start,
-                      :native,
-                      :microsecond
-                    )
-
-                  %WorkResponse{data: data, kind: :ok, response_time: response_time}
+                  %WorkResponse{data: data, kind: :ok, response_time: elapsed_microseconds(task_mono_start)}
                 rescue
                   any_error ->
-                    response_time =
-                      System.convert_time_unit(
-                        System.monotonic_time() - task_mono_start,
-                        :native,
-                        :microsecond
-                      )
-
-                    %WorkResponse{kind: :error, data: any_error, response_time: response_time}
+                    # rescue clause is separate from `catch` so that erlang errors are coerced to elixir errors
+                    %WorkResponse{kind: :error, data: any_error, response_time: elapsed_microseconds(task_mono_start)}
                 catch
                   kind, value ->
-                    response_time =
-                      System.convert_time_unit(
-                        System.monotonic_time() - task_mono_start,
-                        :native,
-                        :microsecond
-                      )
-
-                    %WorkResponse{kind: kind, data: value, response_time: response_time}
+                    %WorkResponse{kind: kind, data: value, response_time: elapsed_microseconds(task_mono_start)}
                 end
 
               is_success? = state.work_spec.is_success?.(response)
@@ -230,5 +212,13 @@ defmodule Loader.ScheduledLoader do
     )
 
     IO.puts("Terminating with reason: #{reason}")
+  end
+
+  defp elapsed_microseconds(native_start_time) do
+    System.convert_time_unit(
+      System.monotonic_time() - native_start_time,
+      :native,
+      :microsecond
+    )
   end
 end

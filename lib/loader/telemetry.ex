@@ -12,6 +12,7 @@ defmodule Loader.Telemetry do
 
   #### Measurements
 
+    * `:monotonic_time` - system monotonic time, as reported by `:erlang.monotonic_time/0` (see the `:telemetry` docs `span/3` function for more details)
     * `:system_time` - system time, as reported by `System.system_time/0`
 
   #### Metadata
@@ -27,7 +28,8 @@ defmodule Loader.Telemetry do
 
   #### Measurements
 
-    * `:duration` - time elapsed since the load profile execution start event
+    * `:duration` - elapsed time since the related `:start` event, calculated with `:erlang.monotonic_time/0` (see the `:telemetry` docs `span/3` function for more details)
+    * `:monotonic_time` - system monotonic time, as reported by `:erlang.monotonic_time/0` (see the `:telemetry` docs `span/3` function for more details)
 
   #### Metadata
 
@@ -60,8 +62,8 @@ defmodule Loader.Telemetry do
 
   #### Measurements
 
+    * `:duration` - elapsed time since the related `:start` event, calculated with `:erlang.monotonic_time/0` (see the `:telemetry` docs `span/3` function for more details)
     * `:monotonic_time` - system monotonic time, as reported by `:erlang.monotonic_time/0` (see the `:telemetry` docs `span/3` function for more details)
-    * `:system_time` - system time, as reported by `:erlang.system_time/0` (see the `:telemetry` docs `span/3` function for more details)
 
   #### Metadata
 
@@ -77,8 +79,8 @@ defmodule Loader.Telemetry do
 
   #### Measurements
 
+    * `:duration` - elapsed time since the related `:start` event, calculated with `:erlang.monotonic_time/0` (see the `:telemetry` docs `span/3` function for more details)
     * `:monotonic_time` - system monotonic time, as reported by `:erlang.monotonic_time/0` (see the `:telemetry` docs `span/3` function for more details)
-    * `:system_time` - system time, as reported by `:erlang.system_time/0` (see the `:telemetry` docs `span/3` function for more details)
 
   #### Metadata
 
@@ -97,7 +99,7 @@ defmodule Loader.Telemetry do
   def start(event, meta_data \\ %{}, extra_measurements \\ %{}) do
     start_time = System.monotonic_time()
     system_time = System.system_time()
-    measurements = Map.merge(extra_measurements, %{system_time: system_time})
+    measurements = Map.merge(extra_measurements, %{system_time: system_time, monotonic_time: start_time})
 
     :telemetry.execute(
       [:loader, event, :start],
@@ -112,7 +114,7 @@ defmodule Loader.Telemetry do
   # emits a `:stop` telemetry event and returns the (monotonic) stop_time
   def stop(event, start_time, meta_data \\ %{}, extra_measurements \\ %{}) do
     end_time = System.monotonic_time()
-    measurements = Map.merge(extra_measurements, %{duration: end_time - start_time})
+    measurements = Map.merge(extra_measurements, %{duration: end_time - start_time, monotomic_time: end_time})
 
     :telemetry.execute(
       [:loader, event, :stop],
@@ -127,7 +129,7 @@ defmodule Loader.Telemetry do
   # emits an `:exception` telemetry event
   def exception(event, start_time, kind, reason, stacktrace, meta_data \\ %{}, extra_measurements \\ %{}) do
     end_time = System.monotonic_time()
-    measurements = Map.merge(extra_measurements, %{duration: end_time - start_time})
+    measurements = Map.merge(extra_measurements, %{duration: end_time - start_time, monotonic_time: end_time})
 
     meta_data =
       meta_data

@@ -107,7 +107,7 @@ The package can be installed by adding `loader` to your list of dependencies in 
 ```elixir
 def deps do
   [
-    {:loader, "~> 0.3.0"}
+    {:loader, "~> 0.4.0"}
   ]
 end
 ```

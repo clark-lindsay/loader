@@ -21,6 +21,10 @@ defmodule Loader.LocalReporter do
     * `:mode_rounding_places` - The number of decimal places to which measurements will be rounded for aggregating the "mode". Defaults to `4`.
     * `:percentile_targets` - The percentile values to be returned in the summary. Defaults to `[25, 50, 75, 90, 95, 99]`.
 
+  ## ETS
+
+  Note that `Loader.LocalReporter` uses one `Registry` (which uses ETS tables) and one ETS table per event name.
+
   """
   use Supervisor
 

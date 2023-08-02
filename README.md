@@ -98,7 +98,7 @@ See the documentation for the `Loader.Telemetry` module for more information.
 
 ## ETS
 
-Note that `Loader` uses one ETS table per instance.
+Note that `Loader` uses one `Registry` (which uses ETS tables) and one ETS table per instance.
 
 ## Installation
 
@@ -107,7 +107,7 @@ The package can be installed by adding `loader` to your list of dependencies in 
 ```elixir
 def deps do
   [
-    {:loader, "~> 0.4.0"}
+    {:loader, "~> 0.5.0"}
   ]
 end
 ```

@@ -1,5 +1,27 @@
 defmodule Loader.LocalReporter do
-  @moduledoc false
+  @moduledoc """
+  ## Options
+
+    * `:name` - **Required.** The name of the reporter instance. Functions as described in the "Name registration" section in the `GenServer` module docs.
+    * `:metrics` - **Required.** The list of `Telemetry.Metrics` structs to be reported on.
+
+  ### Reporter Options
+
+  Additional options can be passed to the metric definitions, depending on the type of metric.
+  All metrics will use the `:reporter_options` key to pass these options.
+
+  #### Distribution (histogram)
+
+    * `:buckets` - Define buckets to group measurements into. However the buckets are defined, a measurement will fall into a bucket when `bucket_fencepost <= value < next_largest_fencepost`. Values that do not fall into one of the defined buckets (e.g. a negative measurement that was not anticipated) will go into a bucket with the key `:out_of_range`. Defaults to `{:percentiles, [0, 25, 50. 75]}`. Buckets can be defined in one of two ways:
+      * as a list, e.g. `[0, 1_000, 5_000, 10_000]`
+      * as percentiles, e.g. `{:percentiles, [0, 25, 50, 75, 90, 95, 99]}`
+
+  #### Summary
+
+    * `:mode_rounding_places` - The number of decimal places to which measurements will be rounded for aggregating the "mode". Defaults to `4`.
+    * `:percentile_targets` - The percentile values to be returned in the summary. Defaults to `[25, 50, 75, 90, 95, 99]`.
+
+  """
   use Supervisor
 
   alias Loader.LocalReporter.ReportStore

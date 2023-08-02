@@ -60,6 +60,7 @@ defmodule Loader.LocalReporter.ReportStore do
 
         :ignore
 
+      # TODO: dive the registry source to see if dialyzer is correct here
       # Dialyzer says that this can never match... is that true?
       # the spec agrees, but is the spec wrong? need to dive the source
       {:error, term} ->
@@ -73,26 +74,17 @@ defmodule Loader.LocalReporter.ReportStore do
   @spec record_measurement(:telemetry.event_name(), map(), map(), {Registry.registry(), [Telemetry.Metrics.t()]}) ::
           [{:ok, reference() | [atom()] | {:cast, [atom()]}} | {:error, term()}] | {:error, term()}
   def record_measurement(event_name, measurements, metadata, {registry, metrics}) do
-    # NOTE: the table_id makes it faster to access the ets table for other calls,
+    # the table_id makes it faster to access the ets table for other calls,
     # and should be used instead of the table name
     table_id =
       event_name
       |> telemetry_event_name_to_atom()
       |> :ets.whereis()
 
-    # TODO: return an error if there is no measurement? or is that ok?
-    # TODO: should this module deal with `keep?`
-
     # NOTE: this function needs to make sure that there will not be any
     # write-conflicts with the ets table, since we are not using message-
     # passing to synchronize/ block.
 
-    # variables:
-    #   - measurement -> nil or not
-    #   - keep? -> true or false
-    #   - ets table? -> exists or doesn't
-
-    # TODO: would it be better to use the registry to shorten this list? or is the filter fast enough?
     if table_id != :undefined do
       for metric <- metrics, event_name == metric.event_name, keep?(metric, metadata) do
         measurement = extract_measurement(metric, measurements, metadata)
@@ -112,7 +104,7 @@ defmodule Loader.LocalReporter.ReportStore do
 
           case metric_type do
             Telemetry.Metrics.Counter ->
-              # updates are atomic and isolated, and thus don't require a write-lock
+              # counter updates are atomic and isolated, and thus don't require a write-lock
               :ets.update_counter(
                 table_id,
                 [:counter | metric_name],
@@ -191,7 +183,6 @@ defmodule Loader.LocalReporter.ReportStore do
 
   @impl GenServer
   def handle_call({:report, metrics}, _from, state) do
-    # TODO: calculate all report stats, and return as a map: `%{metric_name => %Summary{}}`
     name_to_metric =
       if metrics == :all do
         Enum.reduce(state.metrics, %{}, &Map.put(&2, &1.name, &1))
@@ -243,20 +234,24 @@ defmodule Loader.LocalReporter.ReportStore do
             {key, Loader.Stats.summarize(measurements)}
 
           :distribution ->
-            # TODO: add a "percentiles" option for `reporter_options` so that one can ask for percentiles as buckets,
-            # e.g. `reporter_options: [buckets: {:percentiles, [0, 25, 50, 75, 90, 95, 99]}]`
-            # if there are no `buckets` in `reporter_options`, calculate a summary
-            # and use [min, p25, median, p75] as the buckets
             buckets =
-              Keyword.get_lazy(metric.reporter_options, :buckets, fn ->
-                if Enum.empty?(measurements) do
-                  []
-                else
+              case Keyword.get(metric.reporter_options, :buckets) do
+                nil ->
+                  # if there are no `buckets` in `reporter_options`, calculate a summary
+                  # and use [min, p25, median, p75] as the buckets
                   summary = Loader.Stats.summarize(measurements)
 
                   [summary.min, summary.percentiles[25], summary.median, summary.percentiles[75]]
-                end
-              end)
+
+                buckets when is_list(buckets) ->
+                  buckets
+
+                {:percentiles, percentile_buckets} ->
+                  %{percentiles: percentiles} =
+                    Loader.Stats.summarize(measurements, percentile_targets: percentile_buckets)
+
+                  Map.values(percentiles)
+              end
 
             {key, Loader.Stats.to_histogram(measurements, buckets)}
 

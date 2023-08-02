@@ -4,6 +4,8 @@ defmodule StatsTest do
 
   alias Loader.Stats
 
+  doctest Loader.Stats
+
   describe "`summarize/1`" do
     property "the min, max, mode, median, and percentile values are members of the input list" do
       check all(measurements <- StreamData.list_of(StreamData.float(), min_length: 1)) do

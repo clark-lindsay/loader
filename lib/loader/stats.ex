@@ -22,13 +22,12 @@ defmodule Loader.Stats do
   @doc """
   Return summary statistics for a set of measurement values. 
 
-  ## Options
-
-    * `:mode_rounding_places` - The number of decimal places to which measurements will be rounded for aggregating the "mode". Defaults to `4`.
+  See the module documentation for `Loader.LocalReporter`, under the "Summary" heading, for more information on options.
 
   ## Examples
 
   ```elixir
+  iex> import Loader.Stats
   iex> measurements = [1.55, 1.547, 1.6]
   iex> summary = summarize(measurements, mode_rounding_places: 2)
   iex> {[1.55], 2} = summary.mode
@@ -45,11 +44,12 @@ defmodule Loader.Stats do
 
   def summarize(measurements, opts \\ []) do
     mode_rounding_places = opts[:mode_rounding_places] || 4
+    percentile_targets = opts[:percentile_targets] || [25, 50, 75, 90, 95, 99]
 
     total_measurements = Enum.count(measurements)
 
     percentile_indices =
-      for p_target <- [25, 50, 75, 90, 95, 99], reduce: %{} do
+      for p_target <- percentile_targets, reduce: %{} do
         acc ->
           index =
             (p_target / 100 * (total_measurements - 1))

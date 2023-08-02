@@ -18,6 +18,10 @@ defmodule Loader.ExecutionStore do
 
   The details of the `ets` table and the tuple format are an internal detail,
   and should not be relied upon by other modules.
+
+  The table is `:public` so that message passing is not necessary to allow
+  other processes to write to the table, but we avoid race conditions since
+  only atomic operations are used in this module.
   """
   use GenServer
 

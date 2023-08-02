@@ -2,7 +2,6 @@ defmodule Loader.MixProject do
   use Mix.Project
 
   @name "Loader"
-  @external_resource "README.md"
 
   def project do
     [
@@ -16,7 +15,7 @@ defmodule Loader.MixProject do
       elixir: "~> 1.14",
       package: package(),
       start_permanent: Mix.env() == :prod,
-      version: "0.4.0"
+      version: "0.5.0"
     ]
   end
 
@@ -32,7 +31,8 @@ defmodule Loader.MixProject do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:stream_data, "~> 0.5", only: :test, runtime: false},
       {:styler, "~> 0.8", only: [:dev, :test], runtime: false},
-      {:telemetry, "~> 0.4 or ~> 1.2"}
+      {:telemetry, "~> 0.4 or ~> 1.2"},
+      {:telemetry_metrics, "~> 0.6"}
     ]
   end
 

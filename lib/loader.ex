@@ -69,6 +69,43 @@ defmodule Loader do
   @impl Supervisor
   def init(config) do
     children = [
+      # {Loader.LocalReporter,
+      #  name: LocalReporter,
+      #  metrics: [
+      #    Telemetry.Metrics.last_value("loader.task.stop.last_value",
+      #      event_name: "loader.task.stop",
+      #      measurement: :duration,
+      #      unit: {:native, :microsecond}
+      #    ),
+      #    Telemetry.Metrics.counter("loader.task.stop.counter", event_name: "loader.task.stop", measurement: :duration),
+      #    Telemetry.Metrics.sum("loader.task.stop.sum", event_name: "loader.task.stop", measurement: :duration),
+      #    Telemetry.Metrics.summary("loader.task.stop.summary",
+      #      event_name: "loader.task.stop",
+      #       measurement: :duration,
+      #      tags: [:scheduled_loader_ref, :work_spec, :instance_name],
+      #      tag_values: fn metadata ->
+      #        %{
+      #          scheduled_loader_ref: metadata |> Map.get(:scheduled_loader_ref, "") |> inspect(),
+      #          work_spec: metadata |> Map.get(:work_spec, "") |> inspect(),
+      #          instance_name: Map.fetch!(metadata, :instance_name)
+      #        }
+      #      end,
+      #      unit: {:native, :microsecond}
+      #    ),
+      #    Telemetry.Metrics.distribution("loader.task.stop.distribution",
+      #      event_name: "loader.task.stop",
+      #       measurement: :duration,
+      #      tags: [:scheduled_loader_ref, :work_spec, :instance_name],
+      #      tag_values: fn metadata ->
+      #        %{
+      #          scheduled_loader_ref: metadata |> Map.get(:scheduled_loader_ref, "") |> inspect(),
+      #          work_spec: metadata |> Map.get(:work_spec, "") |> inspect(),
+      #          instance_name: Map.fetch!(metadata, :instance_name)
+      #        }
+      #      end,
+      #      unit: {:native, :microsecond}
+      #    )
+      #  ]},
       {Loader.ExecutionStore, name: config.execution_store_name},
       {PartitionSupervisor, child_spec: Task.Supervisor, name: config.task_supervisors_name},
       {DynamicSupervisor, name: config.dynamic_supervisor_name}

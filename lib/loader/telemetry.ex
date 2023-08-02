@@ -94,6 +94,10 @@ defmodule Loader.Telemetry do
 
   """
 
+  # TODOs:
+  #  - when a request goes out, what other metadata or measurements can i track?
+  #     - number of requests already in flight (i.e. the client-side view of the current concurrency of the system under load)
+
   @doc false
   # emits a `:start` telemetry event and returns the (monotonic) start_time
   def start(event, meta_data \\ %{}, extra_measurements \\ %{}) do

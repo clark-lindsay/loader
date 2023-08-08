@@ -35,6 +35,17 @@ defmodule Loader.Stats do
   iex> {[1.6, 1.55, 1.547], 1} = more_precise_summary.mode
   ```
   """
+
+  @typedoc """
+  A map, possibly empty, which represents a histogram. 
+
+  Each "bucket" of the histogram will be a key in the map, whose value will be a list of numbers
+  that satisfy: `key <= value < next_largest_key`.
+
+  Values that do not fall within one of the buckets will be placed into a bucket with key `:out_of_range`.
+  """
+  @type histogram :: %{optional(number) => [number()], optional(:out_of_range) => [number()]}
+
   @spec summarize([number()]) :: %Summary{}
   def summarize([]) do
     %Summary{
@@ -139,7 +150,22 @@ defmodule Loader.Stats do
     |> then(&struct!(Summary, &1))
   end
 
-  # TODO: add docs
+  @doc """
+  Produce a `histogram` for the given measurements and buckets.
+
+  Duplicate buckets will be combined. Buckets that receive no values will be excluded from the output.
+
+  ## Examples
+
+  ```elixir
+  iex> import Loader.Stats
+  iex> measurements = [1, 1.5, 3, 5, 9, -1]
+  iex> buckets = [1, 1, 2, 3, 5]
+  iex>  to_histogram(measurements, buckets)
+  %{1 => [1.5, 1], 3 => [3], 5 => [9, 5], :out_of_range => [-1]}
+  ```
+  """
+  @spec to_histogram(measurements :: [number()], buckets :: [number()]) :: histogram()
   def to_histogram([], _), do: %{}
 
   def to_histogram(measurements, [single_bucket_fencepost]) do
@@ -160,7 +186,7 @@ defmodule Loader.Stats do
       # =>   [0, 0.25, 0.5, 0.75, 1]
       |> Enum.chunk_every(2, 1)
 
-    # =>   [[0, 0.25], [0.25, 0.5], ..., [0.75, 1]]
+    # =>   [[0, 0.25], [0.25, 0.5], ..., [0.75, 1], [1]]
 
     Enum.reduce(measurements, %{}, fn measurement, acc ->
       histogram_key =

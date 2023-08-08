@@ -108,7 +108,7 @@ defmodule StatsTest do
     end
   end
 
-  describe "to_histogram/1" do
+  describe "to_histogram/2" do
     property "cardinality of measurements is the sum of the cardinality of all buckets" do
       check all(
               measurements <- StreamData.list_of(StreamData.float()),
@@ -134,6 +134,20 @@ defmodule StatsTest do
 
         for {fencepost, bucket} <- histogram, is_number(fencepost), value <- bucket do
           assert value >= fencepost
+        end
+      end
+    end
+
+    property "values in the `:out_of_range` bucket are less than the value of any fencepost" do
+      check all(
+            measurements <- StreamData.list_of(StreamData.float()),
+            buckets <- StreamData.list_of(StreamData.float(), min_length: 1)
+      ) do
+        histogram = Stats.to_histogram(measurements, buckets)
+
+        out_of_range_values = histogram[:out_of_range] || []
+        for {fencepost, _bucket} <- histogram, is_number(fencepost), value <- out_of_range_values do
+          assert value < fencepost
         end
       end
     end

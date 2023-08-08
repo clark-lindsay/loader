@@ -80,9 +80,9 @@ defmodule Loader do
       #    Telemetry.Metrics.counter("loader.task.stop.counter", event_name: "loader.task.stop", measurement: :duration),
       #    Telemetry.Metrics.sum("loader.task.stop.sum", event_name: "loader.task.stop", measurement: :duration),
       #    Telemetry.Metrics.summary("loader.task.stop.summary",
-      #       reporter_options: [mode_rounding_places: 0, percentile_targets: [0, 10, 25, 75, 90, 95, 99]],
+      #      reporter_options: [mode_rounding_places: 0, percentile_targets: [0, 10, 25, 75, 90, 95, 99]],
       #      event_name: "loader.task.stop",
-      #       measurement: :duration,
+      #      measurement: :duration,
       #      tags: [:scheduled_loader_ref, :work_spec, :instance_name],
       #      tag_values: fn metadata ->
       #        %{
@@ -94,17 +94,15 @@ defmodule Loader do
       #      unit: {:native, :microsecond}
       #    ),
       #    Telemetry.Metrics.distribution("loader.task.stop.distribution",
-      #     reporter_options: [buckets: {:percentiles, [0, 10, 25, 75, 90, 95, 99]}],
+      #      reporter_options: [buckets: {:percentiles, [0, 10, 25, 75, 90, 95, 99]}],
       #      event_name: "loader.task.stop",
-      #       measurement: :duration,
-      #      tags: [:scheduled_loader_ref, :work_spec, :instance_name],
-      #      tag_values: fn metadata ->
-      #        %{
-      #          scheduled_loader_ref: metadata |> Map.get(:scheduled_loader_ref, "") |> inspect(),
-      #          work_spec: metadata |> Map.get(:work_spec, "") |> inspect(),
-      #          instance_name: Map.fetch!(metadata, :instance_name)
-      #        }
-      #      end,
+      #      measurement: :duration,
+      #      unit: {:native, :microsecond}
+      #    ),
+      #    Telemetry.Metrics.distribution("loader.load_profile_execution.stop.distribution",
+      #      reporter_options: [buckets: {:percentiles, [0, 10, 25, 75, 90, 95, 99]}],
+      #      event_name: "loader.load_profile_execution.stop",
+      #      measurement: :duration,
       #      unit: {:native, :microsecond}
       #    )
       #  ]},

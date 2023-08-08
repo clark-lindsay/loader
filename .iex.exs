@@ -37,3 +37,10 @@ end
 run_report = fn ->
   Loader.LocalReporter.report(LocalReporter, [:loader, :task, :stop])
 end
+
+get_stop_store = fn -> 
+  [_, {reporter_registry, _, _, _}] = Supervisor.which_children(LocalReporter)
+  [{report_store_pid, _val}] = Registry.lookup(reporter_registry, [:loader, :task, :stop])
+
+  report_store_pid
+end

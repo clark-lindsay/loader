@@ -10,6 +10,8 @@ defmodule Loader.LocalReporter do
   Additional options can be passed to the metric definitions, depending on the type of metric.
   All metrics will use the `:reporter_options` key to pass these options.
 
+  TODO: put these options into sub-structures, e.g. `reporter_options.distribution.buckets`
+
   #### Distribution (histogram)
 
     * `:buckets` - Define buckets to group measurements into. However the buckets are defined, a measurement will fall into a bucket when `bucket_fencepost <= value < next_largest_fencepost`. Values that do not fall into one of the defined buckets (e.g. a negative measurement that was not anticipated) will go into a bucket with the key `:out_of_range`. Defaults to `{:percentiles, [0, 25, 50. 75]}`. Buckets can be defined in one of two ways:
@@ -62,6 +64,11 @@ defmodule Loader.LocalReporter do
     Supervisor.init(children, strategy: :rest_for_one)
   end
 
+  @doc """
+  Convenience wrapper for finding a `ReportStore` instance and invoking a function.
+
+  See `ReportStore.report/2` for information and options.
+  """
   def report(instance_name, event_name, opts \\ []) do
     registry = registry_name(instance_name)
 
@@ -70,7 +77,24 @@ defmodule Loader.LocalReporter do
         ReportStore.report(report_store_pid, opts)
 
       _ ->
-        {:error, "Multiple stores found with the same event name"}
+        {:error, "Multiple report stores found with the same event name"}
+    end
+  end
+
+  @doc """
+  Convenience wrapper for finding a `ReportStore` instance and invoking a function.
+
+  See `ReportStore.flush_to_file/2` for information and options.
+  """
+  def flush_to_file(instance_name, event_name, opts \\ []) do
+    registry = registry_name(instance_name)
+
+    case Registry.lookup(registry, event_name) do
+      [{report_store_pid, _value}] ->
+        ReportStore.flush_to_file(report_store_pid, opts)
+
+      _ ->
+        {:error, "Multiple report stores found with the same event name"}
     end
   end
 

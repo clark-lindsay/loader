@@ -15,7 +15,7 @@ defmodule Loader.MixProject do
       elixir: "~> 1.14",
       package: package(),
       start_permanent: Mix.env() == :prod,
-      version: "0.5.2"
+      version: "0.5.3"
     ]
   end
 
@@ -29,6 +29,7 @@ defmodule Loader.MixProject do
     [
       {:decimal, "~> 2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev},
+      {:jason, "~> 1.4"},
       {:stream_data, "~> 0.5", only: :test, runtime: false},
       {:styler, "~> 0.8", only: [:dev, :test], runtime: false},
       {:telemetry, "~> 0.4 or ~> 1.2"},

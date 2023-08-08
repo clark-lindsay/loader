@@ -2,6 +2,9 @@ defmodule Loader.LocalReporter.ReportStore do
   # TODO: possible rethink: instead of just holding the measurements, should i be holding the entire
   # event, so that i have everything i could possibly need when i get a call to aggregate stats? 
   # what's the difference in storage and computational overhead?
+  # TODO: if timeframe reporting is going to be important, should the ets table be an ordered set?
+  # TODO: how much memory can the table consume before it should dump to disk and empty the table?
+  # TODO: handle "tags", which will probably require storing the entire event, not just the measurement
   @moduledoc """
   This GenServer creates a new `ets` table for storing measurements
   for the `:metric` option, and registers itself with the provided registry. 
@@ -53,7 +56,7 @@ defmodule Loader.LocalReporter.ReportStore do
           |> telemetry_event_name_to_atom()
           |> :ets.new([:named_table, :set, :public])
 
-        {:ok, %{metrics: metrics, registry: registry, table_id: table_id}}
+        {:ok, %{event_name: event_name, metrics: metrics, registry: registry, table_id: table_id}}
 
       {:error, {:already_registered, pid}} ->
         IO.warn("This process has already been registered with PID: #{inspect(pid)}")
@@ -141,20 +144,49 @@ defmodule Loader.LocalReporter.ReportStore do
 
   # TODO: should this take an option so a user can get partial reports, just for the
   # particular metric(s) they're interested in at the time?
-  # TODO: should have a default file name format, probably configured via host environment vars
   # TODO: should these take in the registry, instead of the particular server pid?
   # if they take in the registry, it can call _all_ of the child servers and flush everything at once
-  # TODO: add docs
-  def flush_measurements_to_file(server, filename) do
-    GenServer.call(server, {:flush_to_file, filename})
+
+  # TODO: should csv be an option so people can load it into spreadsheets?
+  # TODO: should have a default file name format, probably configured via host environment vars
+  @doc """
+  Write the contents of the store out to a file, as specified by the options, and delete all flushed entries from the table when successful.
+  ## Options
+
+    * `:file_type` - the format in which the file will be written out. Defaults to `:json`.
+      * available values are:
+        * `:ets` - uses the binary format from `:ets.tab2file`
+        * `:json` - a JSON structure with two keys: `"entry_count"` and `"entries"`
+    * `:directory` - the directory where flushed stores will be written. Defaults to `{:absolute, Path.expand("./reports")}`.
+  """
+  @spec flush_to_file(
+          server :: pid(),
+          opts :: nil | [file_type: :ets | :json, directory: {:absolute | :relative_to_cwd, binary()}]
+        ) :: {:ok, path_to_file :: binary()} | {:error, term()}
+  def flush_to_file(server, opts \\ []) do
+    GenServer.call(server, {:flush_to_file, opts})
   end
 
-  # TODO: add docs
-  # TODO: add option for timeframe reporting
-  def report(server, opts \\ []) do
-    metrics = opts[:metrics] || :all
+  # TODO: add option for timeframe reporting (and then document); see note at top of module!
+  # ^ this may require a re-structuring of the data in the ets table
+  # TODO: if we know the location that files are being stored on the local machine, and we get a request
+  # for a timeframe report, couldn't we also aggregate those files into the report, so that we aren't limited
+  # to what is currently in ETS?
+  # TODO: if we're doing all that ^ ... should i just pull in SQLite? and when we "flush" ETS, we create a SQLite
+  # dump file?
+  @doc """
+  Scan all measurements for the `event_name` that are currently stored by the server to produce a report.
 
-    GenServer.call(server, {:report, metrics})
+  ## Options
+
+    * `:metrics` - a list of metric names to be included in the report. Metrics unknown to this `ReportStore` instance will be ignored. Defaults to `:all`.
+  """
+  @spec report(server :: pid(), opts :: nil | [metrics: [Telemetry.Metrics.normalized_metric_name()]]) :: %{
+          optional(Telemetry.Metrics.normalized_metric_name()) =>
+            number() | %Loader.Stats.Summary{} | Loader.Stats.histogram()
+        }
+  def report(server, opts \\ []) do
+    GenServer.call(server, {:report, opts})
   end
 
   # ----- Message Handling -----
@@ -173,21 +205,82 @@ defmodule Loader.LocalReporter.ReportStore do
   end
 
   @impl GenServer
-  def handle_call({:flush_to_file, _filename}, _from, state) do
-    # TODO: write all measurements from `ets` out to a file
-    # should it be csv so people can load it into spreadsheets?
+  def handle_call({:flush_to_file, opts}, _from, state) do
+    # TODO: report directory is something that should also be configurable from an env var
+    opts =
+      opts
+      |> Keyword.put_new(:directory, {:absolute, Path.expand("./reports")})
+      |> Keyword.put_new(:file_type, :json)
 
-    # TODO: replace with file location that we wrote to
-    {:reply, "file_name", state}
+    file_name =
+      String.replace(
+        telemetry_event_name_to_string(state.event_name) <> DateTime.to_string(DateTime.utc_now()),
+        ~r/\s/,
+        "_"
+      )
+
+    directory =
+      case opts[:directory] do
+        {:absolute, path} ->
+          path
+
+        {:relative_to_cwd, path} ->
+          Path.expand(path)
+      end
+
+    file_path = Path.join(directory, file_name)
+
+    write_status =
+      case opts[:file_type] do
+        :json ->
+          # `:ets.foldl/3` has an unspecified traversal order, and so measurements will be out
+          # of order unless a sort step is taken
+          {entries, count} =
+            :ets.foldl(
+              fn {ref, name, measurement}, {list, count} ->
+                {[[inspect(ref), name, measurement] | list], count + 1}
+              end,
+              {[], 0},
+              state.table_id
+            )
+
+          with :ok <- File.mkdir_p(directory),
+               {:ok, io_json} <-
+                 Jason.encode_to_iodata(%{
+                   "entry_count" => count,
+                   "entries" => entries
+                 }) do
+            File.write(file_path <> ".json", io_json)
+          end
+
+        :ets ->
+          with :ok <- File.mkdir_p(directory) do
+            :ets.tab2file(state.table_id, String.to_charlist(file_path), extended_info: [:object_count])
+          end
+      end
+
+    if write_status == :ok do
+      # TODO: do i need to lock the table during this operation?
+      # if we start time-stamping entries, we can just do a select-delete instead
+      :ets.delete_all_objects(state.table_id)
+
+      {:reply, {:ok, file_path}, state}
+    else
+      {:reply, write_status, state}
+    end
   end
 
   @impl GenServer
-  def handle_call({:report, metrics}, _from, state) do
+  def handle_call({:report, opts}, _from, state) do
+    metrics = opts[:metrics] || :all
+
     name_to_metric =
       if metrics == :all do
         Enum.reduce(state.metrics, %{}, &Map.put(&2, &1.name, &1))
       else
-        Enum.reduce(metrics, %{}, &Map.put(&2, &1.name, &1))
+        for metric <- state.metrics, metric.name in metrics, reduce: %{} do
+          acc -> Map.put(acc, metric.name, metric)
+        end
       end
 
     report_measurements =
@@ -283,11 +376,16 @@ defmodule Loader.LocalReporter.ReportStore do
     end
   end
 
-  defp keep?(%{keep: nil}, _metadata), do: true
-  defp keep?(metric, metadata), do: metric.keep.(metadata)
+  defp keep?(%{keep: nil, drop: nil}, _metadata), do: true
+  defp keep?(%{keep: keep}, metadata), do: keep.(metadata)
+  defp keep?(%{drop: drop}, metadata), do: not(drop.(metadata))
 
   defp telemetry_event_name_to_atom(event_name) do
-    event_name |> Enum.map_join(".", &Atom.to_string/1) |> String.to_atom()
+    event_name |> telemetry_event_name_to_string() |> String.to_atom()
+  end
+
+  defp telemetry_event_name_to_string(event_name) do
+    Enum.map_join(event_name, ".", &Atom.to_string/1)
   end
 
   defp metric_type(%struct{} = _metric) do

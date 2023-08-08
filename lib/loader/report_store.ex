@@ -157,7 +157,7 @@ defmodule Loader.LocalReporter.ReportStore do
       * available values are:
         * `:ets` - uses the binary format from `:ets.tab2file`
         * `:json` - a JSON structure with two keys: `"entry_count"` and `"entries"`
-    * `:directory` - the directory where flushed stores will be written. Defaults to `{:absolute, Path.expand("./reports")}`.
+    * `:directory` - the directory where flushed stores will be written. Defaults to `{:relative_to_cwd, "/reports"}`.
   """
   @spec flush_to_file(
           server :: pid(),
@@ -219,13 +219,23 @@ defmodule Loader.LocalReporter.ReportStore do
         "_"
       )
 
+    file_name =
+      if opts[:file_type] == :json do
+        file_name <> ".json"
+      else
+        file_name <> ".ets"
+      end
+
     directory =
       case opts[:directory] do
         {:absolute, path} ->
-          path
+          Path.expand(path)
 
         {:relative_to_cwd, path} ->
           Path.expand(path)
+
+        _ ->
+          Path.expand("./reports")
       end
 
     file_path = Path.join(directory, file_name)
@@ -250,7 +260,7 @@ defmodule Loader.LocalReporter.ReportStore do
                    "entry_count" => count,
                    "entries" => entries
                  }) do
-            File.write(file_path <> ".json", io_json)
+            File.write(file_path, io_json)
           end
 
         :ets ->
@@ -376,9 +386,8 @@ defmodule Loader.LocalReporter.ReportStore do
     end
   end
 
-  defp keep?(%{keep: nil, drop: nil}, _metadata), do: true
-  defp keep?(%{keep: keep}, metadata), do: keep.(metadata)
-  defp keep?(%{drop: drop}, metadata), do: not(drop.(metadata))
+  defp keep?(%{keep: nil}, _metadata), do: true
+  defp keep?(%{keep: keep}, metadata) when is_function(keep), do: keep.(metadata)
 
   defp telemetry_event_name_to_atom(event_name) do
     event_name |> telemetry_event_name_to_string() |> String.to_atom()

@@ -15,7 +15,7 @@ defmodule Loader.MixProject do
       elixir: "~> 1.14",
       package: package(),
       start_permanent: Mix.env() == :prod,
-      version: "0.5.3"
+      version: "0.6.0"
     ]
   end
 

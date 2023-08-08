@@ -140,12 +140,13 @@ defmodule StatsTest do
 
     property "values in the `:out_of_range` bucket are less than the value of any fencepost" do
       check all(
-            measurements <- StreamData.list_of(StreamData.float()),
-            buckets <- StreamData.list_of(StreamData.float(), min_length: 1)
-      ) do
+              measurements <- StreamData.list_of(StreamData.float()),
+              buckets <- StreamData.list_of(StreamData.float(), min_length: 1)
+            ) do
         histogram = Stats.to_histogram(measurements, buckets)
 
         out_of_range_values = histogram[:out_of_range] || []
+
         for {fencepost, _bucket} <- histogram, is_number(fencepost), value <- out_of_range_values do
           assert value < fencepost
         end

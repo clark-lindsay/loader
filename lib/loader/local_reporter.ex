@@ -93,8 +93,11 @@ defmodule Loader.LocalReporter do
       [{report_store_pid, _value}] ->
         ReportStore.flush_to_file(report_store_pid, opts)
 
+      [] ->
+        {:error, "No report store found with event name: #{inspect(event_name)}"}
+
       _ ->
-        {:error, "Multiple report stores found with the same event name"}
+        {:error, "Multiple report stores found with event name: #{inspect(event_name)}"}
     end
   end
 

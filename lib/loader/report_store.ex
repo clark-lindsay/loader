@@ -1,9 +1,9 @@
 defmodule Loader.LocalReporter.ReportStore do
-  # TODO: possible rethink: instead of just holding the measurements, should i be holding the entire
+  # TODO(consideration): possible rethink: instead of just holding the measurements, should i be holding the entire
   # event, so that i have everything i could possibly need when i get a call to aggregate stats? 
   # what's the difference in storage and computational overhead?
-  # TODO: if timeframe reporting is going to be important, should the ets table be an ordered set?
-  # TODO: how much memory can the table consume before it should dump to disk and empty the table?
+  # TODO(consideration): if timeframe reporting is going to be important, should the ets table be an ordered set?
+  # TODO(consideration): how much memory can the table consume before it should dump to disk and empty the table?
   # TODO: handle "tags", which will probably require storing the entire event, not just the measurement
   @moduledoc """
   This GenServer creates a new `ets` table for storing measurements
@@ -142,13 +142,10 @@ defmodule Loader.LocalReporter.ReportStore do
     end
   end
 
-  # TODO: should this take an option so a user can get partial reports, just for the
+  # TODO(consideration): should this take an option so a user can get partial reports, just for the
   # particular metric(s) they're interested in at the time?
-  # TODO: should these take in the registry, instead of the particular server pid?
-  # if they take in the registry, it can call _all_ of the child servers and flush everything at once
-
-  # TODO: should csv be an option so people can load it into spreadsheets?
-  # TODO: should have a default file name format, probably configured via host environment vars
+  # TODO(consideration): should csv be an option so people can load it into spreadsheets?
+  # TODO: needs to have a default file name format, probably configured via host environment vars
   @doc """
   Write the contents of the store out to a file, as specified by the options, and delete all flushed entries from the table when successful.
   ## Options
@@ -172,7 +169,7 @@ defmodule Loader.LocalReporter.ReportStore do
   # TODO: if we know the location that files are being stored on the local machine, and we get a request
   # for a timeframe report, couldn't we also aggregate those files into the report, so that we aren't limited
   # to what is currently in ETS?
-  # TODO: if we're doing all that ^ ... should i just pull in SQLite? and when we "flush" ETS, we create a SQLite
+  # TODO(consideration): if we're doing all that ^ ... should i just pull in SQLite? and when we "flush" ETS, we create a SQLite
   # dump file?
   @doc """
   Scan all measurements for the `event_name` that are currently stored by the server to produce a report.
@@ -206,7 +203,7 @@ defmodule Loader.LocalReporter.ReportStore do
 
   @impl GenServer
   def handle_call({:flush_to_file, opts}, _from, state) do
-    # TODO: report directory is something that should also be configurable from an env var
+    # TODO: report directory is something that must also be configurable from a host env var
     opts =
       opts
       |> Keyword.put_new(:directory, {:absolute, Path.expand("./reports")})
@@ -334,13 +331,15 @@ defmodule Loader.LocalReporter.ReportStore do
 
         case type do
           :summary ->
-            {key, Loader.Stats.summarize(measurements)}
+            summary_opts = Keyword.get(metric.reporter_options, :summary)
+
+            {key, Loader.Stats.summarize(measurements, summary_opts)}
 
           :distribution ->
             buckets =
-              case Keyword.get(metric.reporter_options, :buckets) do
+              case get_in(metric.reporter_options, [:distribution, :buckets]) do
                 nil ->
-                  # if there are no `buckets` in `reporter_options`, calculate a summary
+                  # if there are no `buckets` in `reporter_options.distribution`, calculate a summary
                   # and use [min, p25, median, p75] as the buckets
                   summary = Loader.Stats.summarize(measurements)
 

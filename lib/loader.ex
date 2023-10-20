@@ -31,7 +31,7 @@ defmodule Loader do
     @moduledoc """
     A specification for some "work" to do, to generate load.
     """
-    # TODO: should a `reason` be attached to the `is_success?` callback? so that a user can do something like `{false, "too slow"}`?
+    # TODO(consideration): should a `reason` be attached to the `is_success?` callback? so that a user can do something like `{false, "too slow"}`?
     defstruct [:task, :is_success?]
 
     @type t :: %__MODULE__{
@@ -80,7 +80,12 @@ defmodule Loader do
       #    Telemetry.Metrics.counter("loader.task.stop.counter", event_name: "loader.task.stop", measurement: :duration),
       #    Telemetry.Metrics.sum("loader.task.stop.sum", event_name: "loader.task.stop", measurement: :duration),
       #    Telemetry.Metrics.summary("loader.task.stop.summary",
-      #      reporter_options: [mode_rounding_places: 0, percentile_targets: [0, 10, 25, 75, 90, 95, 99]],
+      #      reporter_options: [
+      #        summary: [
+      #          mode_rounding_places: 0,
+      #          percentile_targets: [0, 10, 25, 75, 90, 95, 99]
+      #        ]
+      #      ],
       #      event_name: "loader.task.stop",
       #      measurement: :duration,
       #      tags: [:scheduled_loader_ref, :work_spec, :instance_name],
@@ -94,13 +99,21 @@ defmodule Loader do
       #      unit: {:native, :microsecond}
       #    ),
       #    Telemetry.Metrics.distribution("loader.task.stop.distribution",
-      #      reporter_options: [buckets: {:percentiles, [0, 10, 25, 75, 90, 95, 99]}],
+      #      reporter_options: [
+      #        distribution: [
+      #          buckets: {:percentiles, [0, 10, 25, 75, 90, 95, 99]}
+      #        ]
+      #      ],
       #      event_name: "loader.task.stop",
       #      measurement: :duration,
       #      unit: {:native, :microsecond}
       #    ),
       #    Telemetry.Metrics.distribution("loader.load_profile_execution.stop.distribution",
-      #      reporter_options: [buckets: {:percentiles, [0, 10, 25, 75, 90, 95, 99]}],
+      #      reporter_options: [
+      #        distribution: [
+      #          buckets: {:percentiles, [0, 10, 25, 75, 90, 95, 99]}
+      #        ]
+      #      ],
       #      event_name: "loader.load_profile_execution.stop",
       #      measurement: :duration,
       #      unit: {:native, :microsecond}

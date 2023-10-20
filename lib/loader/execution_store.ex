@@ -1,5 +1,7 @@
 defmodule Loader.ExecutionStore do
   @moduledoc """
+  TODO: document the purpose and motivation for this module
+
   All entries in the `ets` tables "held" by this process should have the following format:
   TODO: add duration after mono completion time
   ```
